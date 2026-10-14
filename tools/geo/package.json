@@ -1,0 +1,14 @@
+{
+  "name": "atom-geo-tools",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Construction de la carte de la Tunisie et du relief réel du domaine ATOM (Terrain Tiles AWS)",
+  "scripts": {
+    "build": "node build-tunisia.mjs",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "pngjs": "7.0.0"
+  }
+}
