@@ -12,6 +12,8 @@
 // erreur réseau (502/522). On la transforme en 503 JSON propre que la viz sait afficher
 // (« service endormi ») au lieu d'une page d'erreur Cloudflare.
 
+import { handleV1 } from './v1.js';
+
 const API_PREFIXES = [ '/api/', '/mcp' ];
 
 // Défense en profondeur : même si la clé est lecture-seule côté ines, on refuse au bord
@@ -98,6 +100,9 @@ export default {
 
 		const url = new URL( request.url );
 		const path = url.pathname;
+		// API /v1 du tableau de bord : instantanés publiés dans R2 (lecture) et publication par le service.
+		if ( path === '/v1' || path.startsWith( '/v1/' ) ) return handleV1( request, env, url );
+
 		const isApi = API_PREFIXES.some( ( p ) => path === p.replace( /\/$/, '' ) || path.startsWith( p ) );
 
 		if ( isApi ) {

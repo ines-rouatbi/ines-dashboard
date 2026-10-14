@@ -24,8 +24,15 @@
   "vars": {
     // Cible du tunnel nommé « atom » (connecteur sur le Colab d'ines).
     "ORIGIN": "https://atom-origin.zelqane.com"
-  }
+  },
 
+  // Instantanés publiés par le service PC-FNO3D (lot F1, contrat v1). Le tableau de bord ne lit que ça.
+  "r2_buckets": [
+    { "binding": "SNAPSHOTS", "bucket_name": "atom-snapshots" }
+  ]
+
+  // Secrets (jamais dans ce fichier) :
+  //   npx wrangler secret put PUBLISH_TOKEN      jeton de publication remis hors salon au service GPU
   // Secret (jamais dans ce fichier) : clé lecture-seule émise par le service d'ines.
   //   npx wrangler secret put PCFNO3D_READ_KEY
 }
