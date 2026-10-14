@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://atom.zelqane.com/contract/v1/publish-manifest.schema.json",
-  "title": "POST /v1/publish/{id}/commit — manifeste de publication (service GPU → Worker)",
+  "title": "POST /v1/publish/{id}/commit — manifeste de publication d'un instantané (service GPU → Worker)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -9,6 +9,7 @@
     "valid_time",
     "generated_at",
     "last_observation_at",
+    "data_status",
     "versions",
     "files"
   ],
@@ -32,15 +33,11 @@
         }
       ]
     },
+    "data_status": {
+      "$ref": "common.schema.json#/$defs/data_status"
+    },
     "versions": {
       "$ref": "common.schema.json#/$defs/versions"
-    },
-    "data_status": {
-      "enum": [
-        "complete",
-        "degrade"
-      ],
-      "description": "degrade si stations manquantes ou en dérive"
     },
     "files": {
       "type": "array",
@@ -56,11 +53,11 @@
         "properties": {
           "path": {
             "type": "string",
-            "pattern": "^[a-z0-9_./-]+$"
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(/[A-Za-z0-9][A-Za-z0-9_.-]*)*$",
+            "description": "Relatif ; chaque segment commence par une lettre ou un chiffre (ni « .. » ni « _commit »)"
           },
           "sha256": {
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
+            "$ref": "common.schema.json#/$defs/sha256"
           },
           "bytes": {
             "type": "integer",
@@ -68,7 +65,8 @@
             "maximum": 8388608
           }
         }
-      }
+      },
+      "description": "Fichiers de l'instantané, chemins relatifs à snapshots/{id}/. Ni meta.json ni terrain.f32 (fichiers du modèle)"
     }
   }
 }

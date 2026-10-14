@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://atom.zelqane.com/contract/v1/latest.schema.json",
-  "title": "GET /v1/latest — manifeste du dernier instantané publié",
+  "title": "GET /v1/latest — manifeste du dernier instantané publié (écrit par le Worker au /commit)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,6 +11,7 @@
     "published_at",
     "last_observation_at",
     "compute_status",
+    "heartbeat_at",
     "data_status",
     "versions",
     "href"
@@ -57,10 +58,7 @@
       ]
     },
     "data_status": {
-      "enum": [
-        "complete",
-        "degrade"
-      ]
+      "$ref": "common.schema.json#/$defs/data_status"
     },
     "versions": {
       "$ref": "common.schema.json#/$defs/versions"

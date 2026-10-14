@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://atom.zelqane.com/contract/v1/stations.schema.json",
-  "title": "GET /v1/stations/{id} — état du réseau",
+  "title": "GET /v1/stations/{id} — capteurs (liste complète en stations_aneo, capteurs signalés seulement en treillis_synthetique)",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -19,11 +19,16 @@
           "y_m",
           "height_agl_m",
           "state",
-          "last_seen"
+          "last_seen",
+          "speed",
+          "dir_from_deg",
+          "bias_ms",
+          "quality_score"
         ],
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "stations_aneo : identifiant ANEO ; treillis_synthetique : c<i>_<j> (indices du treillis de capteurs à 50 m)"
           },
           "x_m": {
             "type": "number"
@@ -58,7 +63,7 @@
               "number",
               "null"
             ],
-            "description": "écart persistant mesure − reconstruction sans la station"
+            "description": "écart persistant mesure − reconstruction sans le capteur"
           },
           "quality_score": {
             "$ref": "common.schema.json#/$defs/unit_interval"

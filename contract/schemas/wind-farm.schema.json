@@ -1,12 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://atom.zelqane.com/contract/v1/wind-farm.schema.json",
-  "title": "GET /v1/wind-farm/{id} — parc éolien",
+  "title": "GET /v1/wind-farm/{id} — parc éolien (M5)",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "turbines",
-    "farm"
+    "farm",
+    "power_curves"
   ],
   "properties": {
     "turbines": {
@@ -20,6 +21,7 @@
           "x_m",
           "y_m",
           "virtual",
+          "model",
           "hub_agl_m",
           "rotor_d_m",
           "rated_kw",
@@ -27,14 +29,17 @@
           "cut_out_ms",
           "hub_speed",
           "rews",
-          "shear_ms",
+          "shear_alpha",
           "veer_deg",
           "power_kw",
-          "state"
+          "state",
+          "air_density",
+          "air_density_source"
         ],
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$"
           },
           "name": {
             "type": "string"
@@ -49,7 +54,8 @@
             "type": "boolean"
           },
           "model": {
-            "type": "string"
+            "type": "string",
+            "description": "Clé de power_curves"
           },
           "hub_agl_m": {
             "type": "number"
@@ -70,19 +76,24 @@
             "$ref": "common.schema.json#/$defs/interval"
           },
           "rews": {
-            "$ref": "common.schema.json#/$defs/interval"
+            "$ref": "common.schema.json#/$defs/interval",
+            "description": "Vent équivalent rotor, pondéré par l'aire"
           },
-          "shear_ms": {
+          "shear_alpha": {
             "type": [
               "number",
               "null"
-            ]
+            ],
+            "description": "Exposant de loi de puissance entre le bas et le haut du rotor"
           },
           "veer_deg": {
             "type": [
               "number",
               "null"
-            ]
+            ],
+            "minimum": -180,
+            "exclusiveMaximum": 180,
+            "description": "Rotation de la direction du bas vers le haut du rotor, positive dans le sens horaire avec la hauteur"
           },
           "power_kw": {
             "$ref": "common.schema.json#/$defs/interval"
@@ -99,6 +110,16 @@
             "type": [
               "number",
               "null"
+            ],
+            "exclusiveMinimum": 0,
+            "description": "kg/m³"
+          },
+          "air_density_source": {
+            "enum": [
+              "atmosphere_standard",
+              "extrapolation_surface",
+              "mesure",
+              null
             ]
           }
         }
@@ -115,40 +136,48 @@
       ],
       "properties": {
         "power_kw": {
-          "$ref": "common.schema.json#/$defs/interval"
+          "$ref": "common.schema.json#/$defs/interval",
+          "description": "Quantiles calculés sur les membres de l'ensemble (pas la somme des quantiles)"
         },
         "rated_kw": {
           "type": "number"
         },
         "n_production": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         },
         "n_arret": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
-    "power_curve": {
+    "power_curves": {
       "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "speed_ms",
-        "power_kw"
-      ],
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "speed_ms": {
-          "type": "array",
-          "items": {
-            "type": "number"
-          }
-        },
-        "power_kw": {
-          "type": "array",
-          "items": {
-            "type": "number"
+      "description": "Courbes de puissance indexées par turbines[].model",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "speed_ms",
+          "power_kw"
+        ],
+        "properties": {
+          "speed_ms": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "power_kw": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": 0
+            }
           }
         }
       }

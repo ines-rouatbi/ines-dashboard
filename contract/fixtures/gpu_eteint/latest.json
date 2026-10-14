@@ -1,17 +1,19 @@
 {
-  "snapshot_id": "017_120000_b2529442",
+  "snapshot_id": "test_gpu_eteint_e44d68da",
   "valid_time": "2025-01-12T12:00:00Z",
   "generated_at": "2025-01-12T12:00:02Z",
-  "published_at": "2025-01-12T12:00:04Z",
   "last_observation_at": "2025-01-12T11:59:40Z",
+  "published_at": "2025-01-12T12:00:04Z",
   "compute_status": "offline",
   "heartbeat_at": "2025-01-12T12:01:00Z",
   "data_status": "degrade",
   "versions": {
-    "model": "v7",
-    "norm": "n7",
-    "data": "aneo_dataset_3d_v2",
+    "model": "fixture-test",
+    "model_sha256": "e44d68da25fe37103bcbc40f354411b81635a698e87e8eee1ffafac8f6e68348",
+    "norm": "70b219b3",
+    "data": "synthetique_contrat_v1",
+    "data_kind": "test",
     "contract": "1.0"
   },
-  "href": "/v1/snapshots/017_120000_b2529442"
+  "href": "/v1/snapshots/test_gpu_eteint_e44d68da"
 }

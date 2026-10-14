@@ -6,11 +6,13 @@
   "additionalProperties": false,
   "required": [
     "total",
+    "next",
     "items"
   ],
   "properties": {
     "total": {
-      "type": "integer"
+      "type": "integer",
+      "minimum": 0
     },
     "next": {
       "type": [
@@ -35,7 +37,12 @@
             "$ref": "common.schema.json#/$defs/iso_utc"
           },
           "open_alerts": {
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Nombre d'alertes au statut « ouverte » (m9)"
           }
         }
       }
