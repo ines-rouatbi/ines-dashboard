@@ -15,25 +15,29 @@ d'ines (PC-FNO3D, réseau ANEO), tournant sur un Colab éphémère derrière un 
 ```
 navigateur → atom.zelqane.com (ce Worker : front statique dist/ + injection clé + proxy)
    ├─ /           → dist/ (Vite + TypeScript + React 18 + three.js + ECharts)
-   ├─ /v1/*       → instantanés R2 (lot F1 ; en dev : contract/fixtures/)
+   ├─ /v1/*       → src/v1.js : instantanés R2 (en dev : même code sur un faux R2 = contract/fixtures/)
    └─ /api, /mcp  → atom-origin.zelqane.com (CNAME → tunnel nommé « atom »)
                        → cloudflared sur le Colab d'ines → uvicorn 127.0.0.1:8000
 ```
 
 ### Front (`web/`, racine Vite ; build vers `dist/`)
-- `web/src/data/` — client `/v1/*` (JSON + binaires Float32 little-endian, NaN = sous le relief),
-  cache des champs par (instantané, niveau, variable), types du contrat **générés** depuis
+- `web/src/data/` — client `/v1/*` (contrat v1 **révision 2**) : JSON, et un niveau de champ décodé selon
+  l'en-tête `x-atom-dtype` (float32 LE, NaN = absent ; uint8 × `meta.encoding[var].scale`, 255 = absent) ;
+  cache des champs par (instantané, niveau, variable) ; `/v1/column`, `/v1/data-quality` ; types du contrat **générés** depuis
   `contract/schemas/` (`contract.gen.ts`, via `npm run contract:types` ; ne pas l'éditer à la main).
   Une ressource absente remonte comme erreur typée et s'affiche « indisponible ». **Jamais de données de démo.**
 - `web/src/domain/` — fonctions pures testées : direction `dirFrom(u, v)` (d'où vient le vent,
   `null` si < 0,2 m/s), vitesses, conversions, échantillonnage d'un niveau, règle du bandeau de fraîcheur,
-  **profil vertical calculé côté client** depuis les champs de la maille cliquée (intervalle à 80 % :
-  vitesse ± 1,2816·σ, σ propagé depuis σu et σv, borné à 0).
+  **profil vertical au clic calculé par le front** depuis UNE requête `/v1/column/{id}?i&j` (direction météo,
+  intervalle à 80 % = `speed ± 1,2816·sigma_speed` borné à 0, statut mesuré / estimé), capteur visible le plus
+  proche (treillis `c<i>_<j>` à 50 m ou stations ANEO), géoréférencement (plan tangent, `rotation_deg`).
 - `web/src/scene/` — scène three.js (portage de l'ancienne viz) et crochet de test `window.__atom`.
 - `web/src/ui/`, `web/src/pages/` — coquille React (barre, navigation, bandeau) et pages.
-- Repère : x = Est (u), z = -Nord (v), y = altitude (w). Nœuds au centre des mailles
-  (`x_i = (i + 0,5)·dx`). Niveaux au-dessus du niveau de la mer, adressés par **indice** (0..nz-1) ;
-  la grille est toujours lue dans `/v1/meta`. « Position supposée » affichée si `georef.suppose`.
+- Repère : x = Est (u), z = -Nord (v), y = altitude (w). Nœud (i, j) en `x0 + i·dx`, `y0 + j·dy` ; un nœud
+  existe ssi `z − relief ≥ grid.min_agl_m`. Niveaux au-dessus du niveau de la mer, adressés par **indice**
+  (0..nz-1) ; la grille est toujours lue dans `/v1/meta`. « Position supposée » affichée si `georef.suppose`.
+- Nature des données (`versions.data_kind` : test, synthétique, réel) affichée en permanence dans la barre
+  supérieure ; valeurs `null` des blocs pas encore livrés (`kpi`, `physics`…) affichées « non disponible ».
 - Bandeau « Dernier état réel calculé le … » affiché si et seulement si `compute_status != "online"`.
 
 Crochet de test (Playwright) : `window.__atom = { ready, scene, setAltitude(m), pick(x, y) }`, documenté
@@ -61,5 +65,7 @@ npm run build && npm run worker:dev  # Worker local (wrangler dev) sur dist/, ht
 npm run contract:check               # valide schémas, instantanés de test et invariants (ajv)
 npm run contract:types               # régénère web/src/data/contract.gen.ts après une PR du contrat
 ```
-En dev, `GET /v1/*` (y compris `/v1/terrain` et `/v1/times`) est servi depuis
-`contract/fixtures/<ATOM_FIXTURE>/` (par défaut `normal`). Un fichier absent répond `404 {"error":"absent"}`.
+En dev, `GET /v1/*` est servi par **le code du Worker** (`src/v1.js`) branché sur un faux binding R2
+(`dev/fixtures.ts`) qui lit `contract/fixtures/<ATOM_FIXTURE>/` (par défaut `normal`) : une seule
+implémentation de `/v1`, mêmes réponses et mêmes en-têtes qu'en production. Un scénario inexistant répond
+`404 {"error":"absent"}` partout.
