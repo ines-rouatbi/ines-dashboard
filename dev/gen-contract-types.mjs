@@ -22,13 +22,24 @@ function nettoyer( noeud ) {
 
 	if ( Array.isArray( noeud ) ) return noeud.map( nettoyer );
 	if ( ! noeud || typeof noeud !== 'object' ) return noeud;
+	// $ref accompagné d'autres mots-clés (souvent une description) : le déréférencement
+	// fusionnerait les deux et créerait un doublon (Interval1, Sha81…). On l'enveloppe.
+	if ( typeof noeud.$ref === 'string' && Object.keys( noeud ).length > 1 ) {
+
+		const { $ref, ...reste } = noeud;
+		return { ...nettoyer( reste ), allOf: [ nettoyer( { $ref } ) ] };
+
+	}
+
 	const out = {};
 	for ( const [ k, v ] of Object.entries( noeud ) ) {
 
 		if ( k === '$id' || k === '$schema' ) continue;
 		if ( k === '$ref' && typeof v === 'string' ) {
 
-			const m = v.match( /^common\.schema\.json#\/\$defs\/(\w+)$/ );
+			// « common.schema.json#/$defs/x » (depuis une réponse) ou « #/$defs/x » (dans common,
+			// seul fichier à porter des $defs).
+			const m = v.match( /^(?:common\.schema\.json)?#\/\$defs\/(\w+)$/ );
 			if ( ! m ) throw new Error( `référence non prise en charge : ${ v }` );
 			out.$ref = `#/$defs/${ pascal( m[ 1 ] ) }`;
 			continue;
