@@ -1,0 +1,55 @@
+/* Styles des pages Éolien et Alertes (lot F4). Variables à brancher sur la charte de F0 / 17.4. */
+.atom-page {
+	--atom-bg: #0f1720; --atom-card: #17212b; --atom-line: #26323f; --atom-text: #e6edf3; --atom-muted: #8b98a5;
+	--atom-critique: #e5484d; --atom-important: #f76b15; --atom-avertissement: #ffc53d; --atom-information: #3e9bff;
+	--atom-ok: #30a46c;
+	color: var( --atom-text ); font: 14px/1.45 system-ui, sans-serif; padding: 16px;
+}
+.atom-page h2 { margin: 0 0 12px; font-size: 20px; }
+.atom-page h3 { margin: 18px 0 8px; font-size: 15px; }
+.atom-muted { color: var( --atom-muted ); font-weight: normal; }
+.atom-warn { color: var( --atom-avertissement ); }
+
+.atom-kpis { display: flex; flex-wrap: wrap; gap: 8px; }
+.atom-kpi { background: var( --atom-card ); border: 1px solid var( --atom-line ); border-radius: 8px; padding: 8px 12px;
+	color: inherit; font: inherit; text-align: left; display: flex; flex-direction: column; min-width: 120px; }
+button.atom-kpi { cursor: pointer; }
+button.atom-kpi[aria-pressed="false"] { opacity: .45; }
+.atom-kpi-value { font-size: 20px; font-weight: 600; }
+.atom-kpi-label { color: var( --atom-muted ); font-size: 12px; }
+
+.atom-alerts { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.atom-alert { background: var( --atom-card ); border: 1px solid var( --atom-line ); border-left: 4px solid; border-radius: 8px; padding: 10px 12px; }
+.atom-alert header { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.atom-alert h3 { margin: 0; font-size: 14px; flex: 1; }
+.atom-closed .atom-alert { opacity: .75; }
+.atom-badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; }
+.atom-level-critique { border-left-color: var( --atom-critique ); } .atom-level-critique .atom-badge { color: var( --atom-critique ); }
+.atom-level-important { border-left-color: var( --atom-important ); } .atom-level-important .atom-badge { color: var( --atom-important ); }
+.atom-level-avertissement { border-left-color: var( --atom-avertissement ); } .atom-level-avertissement .atom-badge { color: var( --atom-avertissement ); }
+.atom-level-information { border-left-color: var( --atom-information ); } .atom-level-information .atom-badge { color: var( --atom-information ); }
+.atom-kpi.atom-level-critique { border-top: 3px solid var( --atom-critique ); }
+.atom-kpi.atom-level-important { border-top: 3px solid var( --atom-important ); }
+.atom-kpi.atom-level-avertissement { border-top: 3px solid var( --atom-avertissement ); }
+.atom-kpi.atom-level-information { border-top: 3px solid var( --atom-information ); }
+
+.atom-kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 8px 0 0; }
+.atom-kv dt { color: var( --atom-muted ); }
+.atom-kv dd { margin: 0; }
+
+.atom-table { width: 100%; border-collapse: collapse; background: var( --atom-card ); border-radius: 8px; overflow: hidden; }
+.atom-table th, .atom-table td { padding: 6px 8px; border-bottom: 1px solid var( --atom-line ); text-align: left; white-space: nowrap; }
+.atom-table th { color: var( --atom-muted ); font-weight: 500; font-size: 12px; }
+.atom-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.atom-scroll { overflow-x: auto; }
+
+.atom-grid2 { display: grid; grid-template-columns: repeat( auto-fit, minmax( 340px, 1fr ) ); gap: 12px; }
+.atom-card { background: var( --atom-card ); border: 1px solid var( --atom-line ); border-radius: 8px; padding: 12px; }
+.atom-chart { width: 100%; height: 320px; }
+.atom-tag { font-size: 11px; padding: 0 5px; border-radius: 4px; border: 1px solid var( --atom-line ); color: var( --atom-muted ); margin-left: 4px; }
+.atom-state-production { color: var( --atom-ok ); }
+.atom-state-arret_vent_faible, .atom-state-arret_vent_fort { color: var( --atom-avertissement ); }
+.atom-state-indisponible { color: var( --atom-critique ); }
+.atom-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.atom-tabs button { background: var( --atom-bg ); color: inherit; border: 1px solid var( --atom-line ); border-radius: 6px; padding: 4px 10px; font: inherit; cursor: pointer; }
+.atom-tabs button[aria-selected="true"] { border-color: var( --atom-information ); }
