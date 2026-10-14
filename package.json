@@ -13,7 +13,8 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "worker:dev": "wrangler dev",
-    "contract:check": "node dev/contract-check.mjs"
+    "contract:check": "node dev/contract-check.mjs",
+    "contract:types": "node dev/gen-contract-types.mjs"
   },
   "dependencies": {
     "echarts": "6.1.0",
@@ -29,6 +30,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "ajv": "8.20.0",
     "ajv-formats": "3.0.1",
+    "json-schema-to-typescript": "16.0.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
     "vitest": "4.1.11",
