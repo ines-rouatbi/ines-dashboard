@@ -15,13 +15,15 @@ const scenario = process.env.ATOM_FIXTURE || 'normal';
 
 function fixturesV1(): Plugin {
 
-	const mw = () => middlewareFixtures( resolve( ici, 'contract/fixtures' ), scenario );
+	// ATOM_FIXTURES_DIR permet de pointer un autre dossier (par défaut contract/fixtures).
+	const racine = resolve( ici, process.env.ATOM_FIXTURES_DIR || 'contract/fixtures' );
+	const mw = () => middlewareFixtures( racine, scenario );
 	return {
 		name: 'atom-fixtures-v1',
 		configureServer( server ) {
 
 			server.middlewares.use( mw() );
-			server.config.logger.info( `  [atom] /v1/* servi depuis contract/fixtures/${ scenario }/` );
+			server.config.logger.info( `  [atom] /v1/* servi depuis ${ racine }/${ scenario }/` );
 
 		},
 		configurePreviewServer( server ) { server.middlewares.use( mw() ); },
@@ -35,7 +37,11 @@ export default defineConfig( {
 	build: {
 		outDir: resolve( ici, 'dist' ),
 		emptyOutDir: true,
-		chunkSizeWarningLimit: 1500,
+		chunkSizeWarningLimit: 800,
+		rollupOptions: {
+			// Bibliothèques lourdes en morceaux séparés (cache navigateur stable).
+			output: { manualChunks: { three: [ 'three' ], echarts: [ 'echarts' ], react: [ 'react', 'react-dom' ] } },
+		},
 	},
 	test: {
 		root: ici,
