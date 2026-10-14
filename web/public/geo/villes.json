@@ -1,0 +1,131 @@
+{
+  "source": "Scène Tukai Pro « Tunisie — topographie 1:1 — WGS84 » (25 villes géoréférencées)",
+  "crs": "WGS84 (EPSG:4326), degrés décimaux",
+  "villes": [
+    {
+      "nom": "Bizerte",
+      "lat": 37.2746,
+      "lon": 9.8739
+    },
+    {
+      "nom": "Tunis",
+      "lat": 36.8065,
+      "lon": 10.1815
+    },
+    {
+      "nom": "Nabeul",
+      "lat": 36.4561,
+      "lon": 10.7376
+    },
+    {
+      "nom": "Tabarka",
+      "lat": 36.9544,
+      "lon": 8.758
+    },
+    {
+      "nom": "Béja",
+      "lat": 36.7256,
+      "lon": 9.1817
+    },
+    {
+      "nom": "Jendouba",
+      "lat": 36.5011,
+      "lon": 8.7802
+    },
+    {
+      "nom": "Le Kef",
+      "lat": 36.1822,
+      "lon": 8.7148
+    },
+    {
+      "nom": "Siliana",
+      "lat": 36.0849,
+      "lon": 9.3708
+    },
+    {
+      "nom": "Zaghouan",
+      "lat": 36.4029,
+      "lon": 10.1429
+    },
+    {
+      "nom": "Sousse",
+      "lat": 35.8256,
+      "lon": 10.63699
+    },
+    {
+      "nom": "Monastir",
+      "lat": 35.7643,
+      "lon": 10.8113
+    },
+    {
+      "nom": "Mahdia",
+      "lat": 35.5047,
+      "lon": 11.0622
+    },
+    {
+      "nom": "Kairouan",
+      "lat": 35.6781,
+      "lon": 10.0963
+    },
+    {
+      "nom": "Kasserine",
+      "lat": 35.1676,
+      "lon": 8.8365
+    },
+    {
+      "nom": "Sidi Bouzid",
+      "lat": 35.0382,
+      "lon": 9.4849
+    },
+    {
+      "nom": "Sfax",
+      "lat": 34.7406,
+      "lon": 10.7603
+    },
+    {
+      "nom": "Gafsa",
+      "lat": 34.425,
+      "lon": 8.7842
+    },
+    {
+      "nom": "Tozeur",
+      "lat": 33.9197,
+      "lon": 8.1335
+    },
+    {
+      "nom": "Kébili",
+      "lat": 33.7044,
+      "lon": 8.969
+    },
+    {
+      "nom": "Gabès",
+      "lat": 33.8815,
+      "lon": 10.0982
+    },
+    {
+      "nom": "Djerba Houmt Souk",
+      "lat": 33.875,
+      "lon": 10.8575
+    },
+    {
+      "nom": "Médenine",
+      "lat": 33.3549,
+      "lon": 10.5055
+    },
+    {
+      "nom": "Tataouine",
+      "lat": 32.9297,
+      "lon": 10.4518
+    },
+    {
+      "nom": "Remada",
+      "lat": 32.3166,
+      "lon": 10.3966
+    },
+    {
+      "nom": "Borj El Khadra",
+      "lat": 30.2426,
+      "lon": 9.5555
+    }
+  ]
+}
