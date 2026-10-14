@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<title>ANEO · Champ de vent 3D — PC-FNO3D</title>
+	<meta name="description" content="Visualisation 3D du champ de vent reconstruit au-dessus de la Tunisie (PC-FNO3D / ANEO)." />
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%8C%AC%EF%B8%8F%3C/text%3E%3C/svg%3E" />
+	<link rel="stylesheet" href="/styles.css" />
+	<script type="importmap">
+	{
+		"imports": {
+			"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+			"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+		}
+	}
+	</script>
+</head>
+<body>
+	<div id="app">
+		<!-- Scène 3D -->
+		<canvas id="scene"></canvas>
+
+		<!-- Barre supérieure -->
+		<header id="topbar">
+			<div class="brand">
+				<span class="logo">🌬️</span>
+				<div>
+					<div class="title">Champ de vent 3D</div>
+					<div class="subtitle">PC-FNO3D · réseau ANEO · Tunisie</div>
+				</div>
+			</div>
+			<div class="top-right">
+				<span id="status-pill" class="pill pill-wait" title="État du service">· connexion…</span>
+			</div>
+		</header>
+
+		<!-- Panneau de contrôle (gauche) -->
+		<aside id="controls" class="panel">
+			<h2>Contrôles</h2>
+
+			<label class="field">
+				<span>Instant</span>
+				<select id="instant-select"></select>
+			</label>
+
+			<label class="field">
+				<span>Altitude <b id="alt-label">—</b></span>
+				<input id="alt-slider" type="range" min="0" max="11" step="1" value="0" />
+				<div class="level-ticks" id="level-ticks"></div>
+			</label>
+
+			<label class="field">
+				<span>Densité des flèches <b id="density-label">stride 8</b></span>
+				<input id="density-slider" type="range" min="0" max="4" step="1" value="2" />
+			</label>
+
+			<label class="field inline">
+				<input id="toggle-vertical" type="checkbox" />
+				<span>Composante verticale (w) dans les flèches</span>
+			</label>
+
+			<label class="field inline">
+				<input id="toggle-terrain" type="checkbox" checked />
+				<span>Relief &amp; domaine</span>
+			</label>
+
+			<div class="legend">
+				<div class="legend-title">Vitesse du vent</div>
+				<div class="legend-bar" id="legend-bar"></div>
+				<div class="legend-scale"><span id="legend-min">0</span><span id="legend-max">— m/s</span></div>
+			</div>
+
+			<p class="hint">Astuce : <b>clic</b> sur un point pour lire son profil vertical. La direction indique <b>d'où vient</b> le vent.</p>
+		</aside>
+
+		<!-- Tableau de bord (droite) -->
+		<aside id="dashboard" class="panel">
+			<h2>Tableau de bord</h2>
+
+			<section class="card" id="meta-card">
+				<div class="card-title">Grille &amp; domaine</div>
+				<div class="meta-grid" id="meta-grid"><span class="muted">chargement…</span></div>
+			</section>
+
+			<section class="card" id="dso-card">
+				<div class="card-title">Rapport DSO <span class="muted" id="dso-model"></span></div>
+				<div id="dso-list"><span class="muted">—</span></div>
+			</section>
+
+			<section class="card" id="stats-card">
+				<div class="card-title">Niveau sélectionné</div>
+				<div class="stats-row" id="level-stats"><span class="muted">—</span></div>
+			</section>
+
+			<section class="card" id="profile-card">
+				<div class="card-title">Profil vertical <span class="muted" id="profile-pt"></span></div>
+				<canvas id="profile-chart" width="300" height="180"></canvas>
+				<div class="muted small" id="profile-hint">Clique un point de la scène.</div>
+			</section>
+		</aside>
+
+		<!-- Bandeau d'état (service endormi / démo) -->
+		<div id="banner" class="banner hidden"></div>
+	</div>
+
+	<script type="module" src="/app.js"></script>
+</body>
+</html>

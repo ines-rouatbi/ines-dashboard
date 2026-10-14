@@ -1,0 +1,213 @@
+:root {
+	--bg: #0a0e17;
+	--bg-panel: rgba(16, 22, 34, 0.82);
+	--bg-card: rgba(255, 255, 255, 0.035);
+	--border: rgba(255, 255, 255, 0.10);
+	--border-strong: rgba(255, 255, 255, 0.18);
+	--text: #e8edf6;
+	--text-dim: #9aa6bd;
+	--text-mute: #6b7690;
+	--accent: #41d0c4;
+	--accent-2: #7aa2ff;
+	--ok: #4ad88a;
+	--warn: #ffcf5c;
+	--bad: #ff6b6b;
+	--radius: 14px;
+	--shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+	font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+	margin: 0;
+	height: 100%;
+	background: var(--bg);
+	color: var(--text);
+	overflow: hidden;
+}
+
+#app { position: fixed; inset: 0; }
+
+#scene {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	display: block;
+	touch-action: none;
+	background:
+		radial-gradient(1200px 700px at 70% -10%, rgba(65, 208, 196, 0.10), transparent 60%),
+		radial-gradient(900px 600px at 10% 110%, rgba(122, 162, 255, 0.10), transparent 60%),
+		var(--bg);
+}
+
+/* ---- Barre supérieure ---- */
+#topbar {
+	position: absolute;
+	top: 0; left: 0; right: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 18px;
+	pointer-events: none;
+	z-index: 5;
+}
+.brand { display: flex; align-items: center; gap: 12px; pointer-events: auto; }
+.logo { font-size: 26px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.5)); }
+.title { font-weight: 700; font-size: 17px; letter-spacing: .2px; }
+.subtitle { font-size: 12px; color: var(--text-dim); letter-spacing: .3px; }
+.top-right { pointer-events: auto; }
+
+.pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 6px 12px;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	background: var(--bg-panel);
+	backdrop-filter: blur(8px);
+	white-space: nowrap;
+}
+.pill-live { color: var(--ok); border-color: rgba(74, 216, 138, .4); }
+.pill-demo { color: var(--warn); border-color: rgba(255, 207, 92, .4); }
+.pill-wait { color: var(--text-dim); }
+.pill-down { color: var(--bad); border-color: rgba(255, 107, 107, .4); }
+
+/* ---- Panneaux ---- */
+.panel {
+	position: absolute;
+	top: 64px;
+	bottom: 16px;
+	width: 300px;
+	padding: 16px;
+	border-radius: var(--radius);
+	background: var(--bg-panel);
+	border: 1px solid var(--border);
+	box-shadow: var(--shadow);
+	backdrop-filter: blur(14px);
+	overflow-y: auto;
+	z-index: 4;
+}
+#controls { left: 16px; }
+#dashboard { right: 16px; }
+
+.panel h2 {
+	margin: 0 0 14px;
+	font-size: 13px;
+	text-transform: uppercase;
+	letter-spacing: 1.2px;
+	color: var(--text-dim);
+	font-weight: 700;
+}
+
+.field { display: block; margin-bottom: 18px; }
+.field > span { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 7px; }
+.field b { color: var(--text); font-weight: 600; }
+.field.inline { display: flex; align-items: center; gap: 9px; }
+.field.inline span { margin: 0; font-size: 13px; color: var(--text); }
+
+select, input[type="range"] {
+	width: 100%;
+	accent-color: var(--accent);
+}
+select {
+	padding: 9px 10px;
+	border-radius: 9px;
+	background: rgba(0,0,0,.25);
+	color: var(--text);
+	border: 1px solid var(--border-strong);
+	font-size: 13px;
+}
+input[type="range"] { height: 22px; }
+input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+
+.level-ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-mute); margin-top: 4px; }
+
+/* ---- Légende ---- */
+.legend { margin: 6px 0 16px; }
+.legend-title { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+.legend-bar { height: 12px; border-radius: 6px; border: 1px solid var(--border); }
+.legend-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-mute); margin-top: 4px; }
+
+.hint { font-size: 12px; color: var(--text-mute); line-height: 1.5; margin: 4px 0 0; }
+
+/* ---- Cartes du dashboard ---- */
+.card {
+	background: var(--bg-card);
+	border: 1px solid var(--border);
+	border-radius: 11px;
+	padding: 12px;
+	margin-bottom: 12px;
+}
+.card-title { font-size: 12px; font-weight: 700; letter-spacing: .4px; margin-bottom: 9px; color: var(--text); }
+.muted { color: var(--text-mute); }
+.small { font-size: 11px; }
+
+.meta-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12.5px; }
+.meta-grid .k { color: var(--text-dim); }
+.meta-grid .v { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+
+.dso-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 4px 0; }
+.dso-badge { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.dso-badge.ok { background: var(--ok); }
+.dso-badge.bad { background: var(--bad); }
+.dso-badge.warn { background: var(--warn); }
+.dso-name { flex: 1; color: var(--text-dim); }
+.dso-val { font-variant-numeric: tabular-nums; color: var(--text); }
+
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { text-align: center; }
+.stat .n { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 10.5px; color: var(--text-mute); text-transform: uppercase; letter-spacing: .5px; }
+
+#profile-chart { width: 100%; height: auto; display: block; }
+
+/* ---- Bandeau ---- */
+.banner {
+	position: absolute;
+	left: 50%;
+	bottom: 24px;
+	transform: translateX(-50%);
+	max-width: min(560px, 92vw);
+	padding: 11px 18px;
+	border-radius: 11px;
+	background: rgba(40, 30, 10, 0.92);
+	border: 1px solid rgba(255, 207, 92, .35);
+	color: var(--warn);
+	font-size: 13px;
+	text-align: center;
+	box-shadow: var(--shadow);
+	z-index: 6;
+	backdrop-filter: blur(8px);
+}
+.banner.down { background: rgba(40, 12, 12, 0.92); border-color: rgba(255,107,107,.4); color: var(--bad); }
+.banner button {
+	margin-left: 10px;
+	background: transparent;
+	border: 1px solid currentColor;
+	color: inherit;
+	border-radius: 7px;
+	padding: 3px 10px;
+	font-size: 12px;
+	cursor: pointer;
+}
+.hidden { display: none; }
+
+/* ---- Responsive : panneaux repliés en bas sur petit écran ---- */
+@media (max-width: 900px) {
+	.panel {
+		position: absolute;
+		top: auto;
+		bottom: 0;
+		width: 100%;
+		max-height: 44vh;
+		border-radius: 16px 16px 0 0;
+	}
+	#controls { left: 0; display: none; }
+	#dashboard { right: 0; }
+	.title { font-size: 15px; }
+}
