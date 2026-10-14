@@ -190,7 +190,7 @@ function build(scenario) {
 
 	// Manifeste de publication (ce que le service enverra au /commit), puis latest.
 	const pubFiles = files.slice();
-	fs.writeFileSync(path.join(dir, 'publish-manifest.json'), JSON.stringify({ snapshot_id: snapshotId, valid_time: validTime, generated_at: '2025-01-12T12:00:02Z', last_observation_at: '2025-01-12T11:59:40Z', versions: VERSIONS, files: pubFiles }, null, 2) + '\n');
+	fs.writeFileSync(path.join(dir, 'publish-manifest.json'), JSON.stringify({ snapshot_id: snapshotId, valid_time: validTime, generated_at: '2025-01-12T12:00:02Z', last_observation_at: '2025-01-12T11:59:40Z', data_status: scenario === 'normal' ? 'complete' : 'degrade', versions: VERSIONS, files: pubFiles }, null, 2) + '\n');
 	const off = scenario === 'gpu_eteint';
 	fs.writeFileSync(path.join(dir, 'latest.json'), JSON.stringify({ snapshot_id: snapshotId, valid_time: validTime, generated_at: '2025-01-12T12:00:02Z', published_at: '2025-01-12T12:00:04Z', last_observation_at: '2025-01-12T11:59:40Z',
 		compute_status: off ? 'offline' : 'online', heartbeat_at: off ? '2025-01-12T12:01:00Z' : '2025-01-12T12:04:30Z', data_status: scenario === 'normal' ? 'complete' : 'degrade', versions: VERSIONS, href: `/v1/snapshots/${snapshotId}` }, null, 2) + '\n');

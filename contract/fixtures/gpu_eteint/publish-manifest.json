@@ -3,6 +3,7 @@
   "valid_time": "2025-01-12T12:00:00Z",
   "generated_at": "2025-01-12T12:00:02Z",
   "last_observation_at": "2025-01-12T11:59:40Z",
+  "data_status": "degrade",
   "versions": {
     "model": "v7",
     "norm": "n7",

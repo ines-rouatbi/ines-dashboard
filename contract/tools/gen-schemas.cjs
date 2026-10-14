@@ -151,6 +151,7 @@ S('publish-manifest', 'POST /v1/publish/{id}/commit — manifeste de publication
 	properties: {
 		snapshot_id: r('snapshot_id'), valid_time: r('iso_utc'), generated_at: r('iso_utc'),
 		last_observation_at: { anyOf: [r('iso_utc'), { type: 'null' }] }, versions: r('versions'),
+		data_status: { enum: ['complete', 'degrade'], description: 'degrade si stations manquantes ou en dérive' },
 		files: { type: 'array', minItems: 1, items: { type: 'object', additionalProperties: false, required: ['path', 'sha256', 'bytes'],
 			properties: { path: { type: 'string', pattern: '^[a-z0-9_./-]+$' }, sha256: { type: 'string', pattern: '^[0-9a-f]{64}$' }, bytes: { type: 'integer', minimum: 1, maximum: 8388608 } } } },
 	},
