@@ -1,26 +1,33 @@
 // Page « Exploration 3D » : monte la scène portée (scene/viz.ts) sur les données /v1.
 //
-// Données : /v1/meta (grille, niveaux), /v1/latest (instantané courant),
-// /v1/fields/{id}/{niveau}/{u|v|w} (binaires), /v1/profiles/{id}?x&y au clic.
-// Toute ressource absente s'affiche « indisponible » ; aucune donnée de démo.
+// Données : /v1/meta (grille, niveaux, géoréférencement), /v1/latest (instantané courant),
+// /v1/fields/{id}/{niveau}/{var} (binaires, en cache par instantané / niveau / variable),
+// /v1/terrain et /v1/stations/{id} pour le profil au clic, CALCULÉ CÔTÉ CLIENT depuis les
+// champs (domain/profile.ts). Toute ressource absente s'affiche « indisponible » ; aucune
+// donnée de démo.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, libelleErreur, type Meta, type Profile } from '../data';
-import { DENSITES, domaineDepuisMeta, echantillonner, statsPlan, strideCible, type Domaine } from '../domain/field';
+import { api, CacheChamps, libelleErreur, type Meta, type Station } from '../data';
+import { centreMaille, DENSITES, domaineDepuisMeta, echantillonner, mailleDe, statsPlan, strideCible, type Domaine } from '../domain/field';
+import { profilColonne, VARS_PROFIL, type ProfilCalcule, type VarProfil } from '../domain/profile';
 import { cardinal } from '../domain/wind';
 import { Viz, viridisCss, type PickResult, type SceneMeta } from '../scene/viz';
-import { brancherScene, signalerPremierRendu, type AtomPick } from '../scene/hook';
+import { brancherScene, signalerEchec, signalerPremierRendu, type AtomPick } from '../scene/hook';
 import { ProfileChart } from '../ui/ProfileChart';
 import type { EtatLatest } from '../ui/useLatest';
+
+// Cache partagé : il survit à la navigation entre les pages.
+const champs = new CacheChamps( api );
+const stationsParInstantane = new Map<string, Promise<Station[]>>();
 
 const fmt = ( n: number | null | undefined, d = 0 ) =>
 	n == null || ! Number.isFinite( n ) ? '—' : n.toLocaleString( 'fr-FR', { maximumFractionDigits: d, minimumFractionDigits: d } );
 
 type Chargement<T> = { etat: 'attente' } | { etat: 'ok'; val: T } | { etat: 'erreur'; message: string };
 
-interface Composantes { u: Float32Array; v: Float32Array; w: Float32Array | null }
-
 interface Attente { niveau: number; ok: () => void; ko: ( e: unknown ) => void }
+
+interface ProfilAffiche extends ProfilCalcule { station: { id: string; distance_m: number } | null }
 
 /** Indice du niveau le plus proche d'une altitude (m au-dessus de la mer). */
 function niveauProche( altitudes: number[], m: number ): number {
@@ -31,13 +38,60 @@ function niveauProche( altitudes: number[], m: number ): number {
 
 }
 
+function stations( id: string ): Promise<Station[]> {
+
+	let p = stationsParInstantane.get( id );
+	if ( ! p ) {
+
+		p = api.stations( id ).then( ( s ) => s.items );
+		p.catch( () => stationsParInstantane.delete( id ) );
+		stationsParInstantane.set( id, p );
+
+	}
+
+	return p;
+
+}
+
+/** Charge les champs de tous les niveaux à la maille (i, j) et assemble le profil. */
+async function chargerProfil( id: string, dom: Domaine, i: number, j: number ): Promise<ProfilAffiche> {
+
+	const parNiveau = await Promise.all( dom.altitudes.map( async ( _, k ) => {
+
+		const entrees = await Promise.all( VARS_PROFIL.map( async ( v ) => {
+
+			// u, v, speed sont indispensables ; les autres variables peuvent manquer.
+			const indispensable = v === 'u' || v === 'v' || v === 'speed';
+			const p = champs.champ( id, k, v );
+			return [ v, indispensable ? await p : await p.catch( () => undefined ) ] as const;
+
+		} ) );
+		return Object.fromEntries( entrees ) as Partial<Record<VarProfil, Float32Array>>;
+
+	} ) );
+	const terrain = await champs.terrain().catch( () => null );
+	const profil = profilColonne( dom, i, j, parNiveau, terrain );
+	const st = await stations( id ).catch( () => [] as Station[] );
+	let station: ProfilAffiche[ 'station' ] = null;
+	for ( const s of st ) {
+
+		if ( s.state === 'exclue' || s.state === 'muette' ) continue;
+		const d = Math.hypot( s.x_m - profil.x_m, s.y_m - profil.y_m );
+		if ( ! station || d < station.distance_m ) station = { id: s.id, distance_m: d };
+
+	}
+
+	return { ...profil, station };
+
+}
+
 export function Exploration( { latest }: { latest: EtatLatest } ) {
 
 	const canvasRef = useRef<HTMLCanvasElement>( null );
 	const vizRef = useRef<Viz | null>( null );
-	const cache = useRef( new Map<string, Promise<Composantes>>() );
 	const attentes = useRef<Attente[]>( [] );
 	const rendu = useRef<number | null>( null ); // niveau effectivement affiché
+	const premierRendu = useRef( false );
 
 	const [ meta, setMeta ] = useState<Chargement<{ meta: Meta; dom: Domaine }>>( { etat: 'attente' } );
 	const [ niveau, setNiveau ] = useState<number | null>( null );
@@ -45,12 +99,10 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	const [ vertical, setVertical ] = useState( false );
 	const [ relief, setRelief ] = useState( true );
 	const [ plan, setPlan ] = useState<Chargement<{ stats: ReturnType<typeof statsPlan>; range: [ number, number ]; stride: number }>>( { etat: 'attente' } );
-	const [ profil, setProfil ] = useState<{ x_m: number; y_m: number; res: Chargement<Profile> } | null>( null );
+	const [ profil, setProfil ] = useState<{ cle: string; x_m: number; y_m: number; res: Chargement<ProfilAffiche> } | null>( null );
 
 	const snapshotId = latest.etat === 'ok' ? latest.latest.snapshot_id : null;
 	const dom = meta.etat === 'ok' ? meta.val.dom : null;
-	const xMin = meta.etat === 'ok' ? meta.val.meta.domain?.x_min_m ?? 0 : 0;
-	const yMin = meta.etat === 'ok' ? meta.val.meta.domain?.y_min_m ?? 0 : 0;
 
 	// 1. /v1/meta (jamais de grille codée en dur).
 	useEffect( () => {
@@ -66,29 +118,39 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 				setNiveau( ( n ) => n ?? ( def >= 0 ? def : Math.max( 0, d.nz - 1 ) ) );
 
 			},
-			( e ) => { if ( e.name !== 'AbortError' ) setMeta( { etat: 'erreur', message: libelleErreur( e ) } ); },
+			( e ) => {
+
+				if ( e.name === 'AbortError' ) return;
+				setMeta( { etat: 'erreur', message: libelleErreur( e ) } );
+				signalerEchec( `/v1/meta ${ libelleErreur( e ) }`, true );
+
+			},
 		);
 		return () => ctl.abort();
 
 	}, [] );
 
-	// 2. Profil vertical au clic.
+	useEffect( () => { if ( latest.etat === 'erreur' ) signalerEchec( `/v1/latest ${ latest.message }`, true ); }, [ latest ] );
+
+	// 2. Profil vertical au clic (maille native, calcul côté client).
 	const surPick = useRef<( p: PickResult ) => AtomPick | null>( () => null );
 	surPick.current = ( p ) => {
 
 		if ( ! dom ) return null;
-		const x_m = xMin + p.fx * dom.sizeX, y_m = yMin + p.fy * dom.sizeY;
+		const { i, j } = mailleDe( dom, p.fx * dom.sizeX, p.fy * dom.sizeY );
+		const { x_m, y_m } = centreMaille( dom, i, j );
 		if ( snapshotId ) {
 
-			setProfil( { x_m, y_m, res: { etat: 'attente' } } );
-			api.profile( snapshotId, x_m, y_m ).then(
-				( val ) => setProfil( ( cur ) => cur && cur.x_m === x_m && cur.y_m === y_m ? { x_m, y_m, res: { etat: 'ok', val } } : cur ),
-				( e ) => setProfil( ( cur ) => cur && cur.x_m === x_m && cur.y_m === y_m ? { x_m, y_m, res: { etat: 'erreur', message: libelleErreur( e ) } } : cur ),
+			const cle = `${ snapshotId }/${ i }/${ j }`;
+			setProfil( { cle, x_m, y_m, res: { etat: 'attente' } } );
+			chargerProfil( snapshotId, dom, i, j ).then(
+				( val ) => setProfil( ( cur ) => cur?.cle === cle ? { ...cur, res: { etat: 'ok', val } } : cur ),
+				( e ) => setProfil( ( cur ) => cur?.cle === cle ? { ...cur, res: { etat: 'erreur', message: libelleErreur( e ) } } : cur ),
 			);
 
 		}
 
-		return { ...p, x_m, y_m };
+		return { ...p, i, j, x_m, y_m };
 
 	};
 
@@ -104,26 +166,6 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	// 4. Géométrie du domaine dans la scène.
 	const sceneMeta = useMemo<SceneMeta | null>( () => dom && { nx: dom.nx, ny: dom.ny, altitudes: dom.altitudes, sizeX: dom.sizeX, sizeY: dom.sizeY }, [ dom ] );
 	useEffect( () => { if ( sceneMeta && vizRef.current ) { vizRef.current.setMeta( sceneMeta ); rendu.current = null; } }, [ sceneMeta ] );
-
-	const composantes = useCallback( ( id: string, k: number ): Promise<Composantes> => {
-
-		const cle = `${ id }/${ k }`;
-		let p = cache.current.get( cle );
-		if ( ! p ) {
-
-			p = Promise.all( [
-				api.field( id, k, 'u' ),
-				api.field( id, k, 'v' ),
-				api.field( id, k, 'w' ).catch( () => null ), // w facultatif pour l'affichage
-			] ).then( ( [ u, v, w ] ) => ( { u, v, w } ) );
-			p.catch( () => cache.current.delete( cle ) );
-			cache.current.set( cle, p );
-
-		}
-
-		return p;
-
-	}, [] );
 
 	const reglerAttentes = useCallback( ( k: number, erreur?: unknown ) => {
 
@@ -146,7 +188,11 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 		if ( ! viz || ! dom || niveau == null || ! snapshotId ) return;
 		let actif = true;
 		setPlan( ( p ) => ( p.etat === 'ok' ? p : { etat: 'attente' } ) );
-		composantes( snapshotId, niveau ).then( async ( { u, v, w } ) => {
+		Promise.all( [
+			champs.champ( snapshotId, niveau, 'u' ),
+			champs.champ( snapshotId, niveau, 'v' ),
+			champs.champ( snapshotId, niveau, 'w' ).catch( () => null ), // w facultatif pour l'affichage
+		] ).then( async ( [ u, v, w ] ) => {
 
 			if ( ! actif ) return;
 			const stride = strideCible( dom.nx, dom.ny, DENSITES[ densite ] );
@@ -156,6 +202,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 			await viz.apresRendu();
 			if ( ! actif ) return;
 			rendu.current = niveau;
+			premierRendu.current = true;
 			signalerPremierRendu();
 			reglerAttentes( niveau );
 
@@ -163,12 +210,13 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 
 			if ( ! actif ) return;
 			setPlan( { etat: 'erreur', message: libelleErreur( e ) } );
+			signalerEchec( `champ du niveau ${ niveau } ${ libelleErreur( e ) }`, ! premierRendu.current );
 			reglerAttentes( niveau, e );
 
 		} );
 		return () => { actif = false; };
 
-	}, [ dom, niveau, densite, vertical, snapshotId, composantes, reglerAttentes ] );
+	}, [ dom, niveau, densite, vertical, snapshotId, reglerAttentes ] );
 
 	useEffect( () => { vizRef.current?.setTerrainVisible( relief ); }, [ relief, sceneMeta ] );
 
@@ -193,10 +241,11 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 			},
 			pick: async ( x, y ) => {
 
+				// (x, y) : pixels CSS relatifs au coin haut-gauche du canevas.
 				const r = viz.canvas.getBoundingClientRect();
 				const p = viz.pickAt( r.left + x, r.top + y );
 				await viz.apresRendu();
-				return p ? surPick.current( { ...p } ) ?? null : null;
+				return p ? surPick.current( { ...p } ) : null;
 
 			},
 		} );
@@ -207,6 +256,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	const altitudes = dom?.altitudes ?? [];
 	const altCourante = niveau != null ? altitudes[ niveau ] : null;
 	const degrade = useMemo( () => `linear-gradient(90deg, ${ Array.from( { length: 10 }, ( _, i ) => viridisCss( i / 9 ) ).join( ',' ) })`, [] );
+	const georef = meta.etat === 'ok' ? meta.val.meta.georef : null;
 
 	let messageScene: string | null = null;
 	if ( meta.etat === 'erreur' ) messageScene = `Grille ${ meta.message }`;
@@ -260,12 +310,12 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 					</div>
 				</div>
 
-				<p className="astuce">Clic sur la scène : profil vertical du point. La direction indique <b>d'où vient</b> le vent.</p>
+				<p className="astuce">Clic sur la scène : profil vertical de la maille. La direction indique <b>d'où vient</b> le vent.</p>
 			</aside>
 
 			<div className="scene">
 				<canvas ref={ canvasRef } data-testid="scene-canvas" />
-				{ messageScene && <div className="scene-message">{ messageScene }</div> }
+				{ messageScene && <div className="scene-message" data-testid="scene-message">{ messageScene }</div> }
 			</div>
 
 			<aside className="panneau tableau">
@@ -275,9 +325,11 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 						<dl className="grille-cles num">
 							<dt>Identifiant</dt><dd>{ latest.latest.snapshot_id }</dd>
 							<dt>Instant de validité</dt><dd>{ new Date( latest.latest.valid_time ).toLocaleString( 'fr-FR' ) }</dd>
-							<dt>Modèle</dt><dd>{ latest.latest.model_version }</dd>
+							<dt>Modèle</dt><dd>{ latest.latest.versions.model }</dd>
 							<dt>Grille</dt><dd>{ dom ? `${ dom.nx } × ${ dom.ny } × ${ dom.nz }` : '—' }</dd>
 							<dt>Domaine</dt><dd>{ dom ? `${ fmt( dom.sizeX / 1000, 1 ) } × ${ fmt( dom.sizeY / 1000, 1 ) } km` : '—' }</dd>
+							<dt>Position</dt>
+							<dd data-testid="georef">{ georef ? `${ fmt( georef.lat0, 2 ) }° N, ${ fmt( georef.lon0, 2 ) }° E${ georef.suppose ? ' (position supposée)' : '' }` : '—' }</dd>
 						</dl>
 					) : <p className="muet">{ latest.etat === 'erreur' ? latest.message : 'chargement…' }</p> }
 				</section>
@@ -294,8 +346,8 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 					) : <p className="muet">{ plan.etat === 'erreur' ? plan.message : '—' }</p> }
 				</section>
 
-				<section className="carte">
-					<h3>Profil vertical { profil && <span className="muet num">· { fmt( profil.x_m / 1000, 1 ) }, { fmt( profil.y_m / 1000, 1 ) } km</span> }</h3>
+				<section className="carte" data-testid="profil">
+					<h3>Profil vertical { profil && <span className="muet num">· { fmt( profil.x_m / 1000, 2 ) }, { fmt( profil.y_m / 1000, 2 ) } km</span> }</h3>
 					<Profil profil={ profil } />
 				</section>
 			</aside>
@@ -304,21 +356,39 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 
 }
 
-function Profil( { profil }: { profil: { res: Chargement<Profile> } | null } ) {
+function Profil( { profil }: { profil: { res: Chargement<ProfilAffiche> } | null } ) {
 
 	if ( ! profil ) return <p className="muet">Cliquer un point de la scène.</p>;
 	if ( profil.res.etat === 'attente' ) return <p className="muet">chargement…</p>;
 	if ( profil.res.etat === 'erreur' ) return <p className="muet">Profil { profil.res.message }</p>;
 	const p = profil.res.val;
-	if ( ! Array.isArray( p.levels ) || ! p.levels.length ) return <p className="muet">Profil indisponible</p>;
-	const haut = [ ...p.levels ].reverse().find( ( n ) => ! n.below_terrain && n.direction_deg != null );
 	return (
 		<>
 			<ProfileChart niveaux={ p.levels } />
 			<p className="muet petit num">
-				{ haut ? `Au sommet : vent du ${ cardinal( haut.direction_deg ?? null ) } (${ fmt( haut.direction_deg, 0 ) }°)` : '' }
-				{ p.nearest_station ? ` · station la plus proche : ${ p.nearest_station.name ?? p.nearest_station.id }` : '' }
+				Relief { fmt( p.z_terrain_m, 0 ) } m
+				{ p.station ? ` · station la plus proche : ${ p.station.id } (${ fmt( p.station.distance_m / 1000, 1 ) } km)` : '' }
+				{ ' · intervalle à 80 %' }
 			</p>
+			<table className="tableau-profil num">
+				<thead><tr><th>Alt. mer</th><th>Sol</th><th>Vitesse</th><th>p10–p90</th><th>Vient du</th><th>Statut</th></tr></thead>
+				<tbody>
+					{ [ ...p.levels ].reverse().map( ( l ) => (
+						<tr key={ l.z_asl_m } className={ l.below_terrain ? 'sous-relief' : undefined }>
+							<td>{ fmt( l.z_asl_m ) } m</td>
+							<td>{ fmt( l.agl_m ) } m</td>
+							{ l.below_terrain ? <td colSpan={ 4 }>sous le relief</td> : (
+								<>
+									<td>{ fmt( l.speed, 1 ) }</td>
+									<td>{ fmt( l.speed_interval.p10, 1 ) }–{ fmt( l.speed_interval.p90, 1 ) }</td>
+									<td>{ l.dir_from_deg == null ? 'calme' : `${ cardinal( l.dir_from_deg ) } ${ fmt( l.dir_from_deg ) }°` }</td>
+									<td>{ l.status === 'mesure' ? 'mesuré' : l.status === 'estime' ? 'estimé' : '—' }</td>
+								</>
+							) }
+						</tr>
+					) ) }
+				</tbody>
+			</table>
 		</>
 	);
 

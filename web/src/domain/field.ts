@@ -1,14 +1,20 @@
 // Préparation d'un plan (un niveau) pour la scène : échantillonnage et masque du relief.
 //
 // Entrée : grilles natives Float32 [j][i] (j = sud→nord, i = ouest→est), NaN = sous le relief.
+// Les nœuds sont au CENTRE des mailles : x_i = (i + 0,5)·dx, y_j = (j + 0,5)·dy, et le
+// domaine couvre [0, nx·dx] × [0, ny·dy] depuis le coin sud-ouest (contrat v1).
 // Sortie : grille échantillonnée (pas `stride`), même convention d'index j * nx + i.
 
 import type { Meta } from '../data/contract';
 
 export interface Plan {
 	altitude: number;
+	/** Taille de la grille échantillonnée. */
 	nx: number;
 	ny: number;
+	/** Taille de la grille native (pour placer chaque nœud au centre de sa maille). */
+	nxNatif: number;
+	nyNatif: number;
 	dx: number;
 	dy: number;
 	stride: number;
@@ -26,20 +32,32 @@ export interface Domaine {
 	nz: number;
 	dx: number;
 	dy: number;
-	/** Étendue Est (m) et Nord (m) depuis le coin sud-ouest. */
+	/** Étendue Est (m) et Nord (m) du domaine, depuis le coin sud-ouest. */
 	sizeX: number;
 	sizeY: number;
+	/** Altitudes des niveaux, m au-dessus de la mer ; l'indice est le {level} de /v1/fields. */
 	altitudes: number[];
 }
 
 export function domaineDepuisMeta( meta: Meta ): Domaine {
 
-	const { nx, ny, dx_m, dy_m } = meta.grid;
-	const altitudes = meta.levels_m_asl ?? [];
-	const d = meta.domain;
-	const sizeX = d?.x_max_m != null && d?.x_min_m != null ? d.x_max_m - d.x_min_m : ( nx - 1 ) * dx_m;
-	const sizeY = d?.y_max_m != null && d?.y_min_m != null ? d.y_max_m - d.y_min_m : ( ny - 1 ) * dy_m;
-	return { nx, ny, nz: meta.grid.nz ?? altitudes.length, dx: dx_m, dy: dy_m, sizeX, sizeY, altitudes };
+	const { nx, ny, nz, dx_m, dy_m, levels_asl_m } = meta.grid;
+	return { nx, ny, nz: nz ?? levels_asl_m.length, dx: dx_m, dy: dy_m, sizeX: nx * dx_m, sizeY: ny * dy_m, altitudes: [ ...levels_asl_m ] };
+
+}
+
+/** Maille native contenant le point (x_m, y_m), bornée au domaine. */
+export function mailleDe( dom: Pick<Domaine, 'nx' | 'ny' | 'dx' | 'dy'>, xM: number, yM: number ): { i: number; j: number } {
+
+	const c = ( v: number, n: number ) => Math.min( n - 1, Math.max( 0, Math.floor( v ) ) );
+	return { i: c( xM / dom.dx, dom.nx ), j: c( yM / dom.dy, dom.ny ) };
+
+}
+
+/** Centre (m) de la maille native (i, j). */
+export function centreMaille( dom: Pick<Domaine, 'dx' | 'dy'>, i: number, j: number ): { x_m: number; y_m: number } {
+
+	return { x_m: ( i + 0.5 ) * dom.dx, y_m: ( j + 0.5 ) * dom.dy };
 
 }
 
@@ -84,7 +102,7 @@ export function echantillonner(
 
 	}
 
-	return { altitude, nx, ny, dx: dom.dx * s, dy: dom.dy * s, stride: s, u: ou, v: ov, w: ow, mask };
+	return { altitude, nx, ny, nxNatif: NX, nyNatif: NY, dx: dom.dx * s, dy: dom.dy * s, stride: s, u: ou, v: ov, w: ow, mask };
 
 }
 

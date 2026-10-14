@@ -5,7 +5,7 @@
 
 import { decodeFloat32LE } from './binary';
 import type {
-	Alerts, FieldVar, Latest, Meta, Profile, Quality, Snapshot, Stations, WindFarm, WindRose,
+	Alerts, FieldVar, Latest, Meta, Profile, Quality, Snapshot, Stations, Times, WindFarm, WindRose,
 } from './contract';
 
 export type CodeErreur = 'absent' | 'http' | 'reseau' | 'invalide';
@@ -28,10 +28,10 @@ export class ApiError extends Error {
 
 const enc = encodeURIComponent;
 
-async function requete( path: string, accept: string, signal?: AbortSignal ): Promise<Response> {
+async function requete( url: string, accept: string, signal?: AbortSignal ): Promise<Response> {
 
 	let r: Response;
-	try { r = await fetch( path, { headers: { accept }, signal } ); }
+	try { r = await fetch( url, { headers: { accept }, signal } ); }
 	catch ( e ) {
 
 		if ( ( e as Error )?.name === 'AbortError' ) throw e;
@@ -39,7 +39,13 @@ async function requete( path: string, accept: string, signal?: AbortSignal ): Pr
 
 	}
 
-	if ( r.status === 404 ) throw new ApiError( 'absent', `${ path } : absent`, 404 );
+	if ( r.status === 404 ) {
+
+		await r.body?.cancel().catch( () => {} );
+		throw new ApiError( 'absent', `${ url } : absent`, 404 );
+
+	}
+
 	if ( ! r.ok ) {
 
 		const body = await r.json().catch( () => null ) as { error?: string; message?: string } | null;
@@ -51,47 +57,80 @@ async function requete( path: string, accept: string, signal?: AbortSignal ): Pr
 
 }
 
-export async function getJSON<T>( path: string, signal?: AbortSignal ): Promise<T> {
+export async function getJSON<T>( url: string, signal?: AbortSignal ): Promise<T> {
 
-	const r = await requete( path, 'application/json', signal );
-	// Tant que le Worker ne sert pas /v1 (lot F1), le repli SPA peut renvoyer index.html.
+	const r = await requete( url, 'application/json', signal );
+	// Le repli SPA d'un serveur mal configuré peut renvoyer index.html : on le refuse.
 	const type = r.headers.get( 'content-type' ) ?? '';
-	if ( ! type.includes( 'json' ) ) throw new ApiError( 'invalide', `${ path } : réponse non JSON (${ type || 'type inconnu' })`, r.status );
+	if ( ! type.includes( 'json' ) ) {
+
+		await r.body?.cancel().catch( () => {} );
+		throw new ApiError( 'invalide', `${ url } : réponse non JSON (${ type || 'type inconnu' })`, r.status );
+
+	}
+
 	try { return await r.json() as T; }
-	catch { throw new ApiError( 'invalide', `${ path } : JSON illisible`, r.status ); }
+	catch { throw new ApiError( 'invalide', `${ url } : JSON illisible`, r.status ); }
 
 }
 
-export async function getFloat32( path: string, signal?: AbortSignal ): Promise<Float32Array> {
+export async function getFloat32( url: string, signal?: AbortSignal ): Promise<Float32Array> {
 
-	const r = await requete( path, 'application/octet-stream', signal );
+	const r = await requete( url, 'application/octet-stream', signal );
 	const type = r.headers.get( 'content-type' ) ?? '';
-	if ( type.includes( 'text/html' ) || type.includes( 'json' ) ) throw new ApiError( 'invalide', `${ path } : binaire attendu (${ type })`, r.status );
+	if ( type.includes( 'text/html' ) || type.includes( 'json' ) ) {
+
+		await r.body?.cancel().catch( () => {} );
+		throw new ApiError( 'invalide', `${ url } : binaire attendu (${ type })`, r.status );
+
+	}
+
 	try { return decodeFloat32LE( await r.arrayBuffer() ); }
-	catch ( e ) { throw new ApiError( 'invalide', `${ path } : ${ ( e as Error ).message }`, r.status ); }
+	catch ( e ) { throw new ApiError( 'invalide', `${ url } : ${ ( e as Error ).message }`, r.status ); }
 
 }
 
-/** Points d'accès du contrat v1. `level` = indice du niveau (0..nz-1). */
-export const api = {
-	meta: ( s?: AbortSignal ) => getJSON<Meta>( '/v1/meta', s ),
-	latest: ( s?: AbortSignal ) => getJSON<Latest>( '/v1/latest', s ),
-	snapshot: ( id: string, s?: AbortSignal ) => getJSON<Snapshot>( `/v1/snapshots/${ enc( id ) }`, s ),
-	field: ( id: string, level: number, variable: FieldVar, s?: AbortSignal ) =>
-		getFloat32( `/v1/fields/${ enc( id ) }/${ level }/${ variable }`, s ),
-	profile: ( id: string, xM: number, yM: number, s?: AbortSignal ) =>
-		getJSON<Profile>( `/v1/profiles/${ enc( id ) }?${ new URLSearchParams( { x: String( Math.round( xM ) ), y: String( Math.round( yM ) ) } ) }`, s ),
-	quality: ( id: string, s?: AbortSignal ) => getJSON<Quality>( `/v1/quality/${ enc( id ) }`, s ),
-	alerts: ( id: string, s?: AbortSignal ) => getJSON<Alerts>( `/v1/alerts/${ enc( id ) }`, s ),
-	stations: ( id: string, s?: AbortSignal ) => getJSON<Stations>( `/v1/stations/${ enc( id ) }`, s ),
-	windFarm: ( id: string, s?: AbortSignal ) => getJSON<WindFarm>( `/v1/wind-farm/${ enc( id ) }`, s ),
-	windrose: ( params: Record<string, string> = {}, s?: AbortSignal ) => {
+/**
+ * Points d'accès du contrat v1. `base` = origine du serveur ('' = même origine).
+ * `level` = indice du niveau (0..nz-1).
+ */
+export function creerApi( base = '' ) {
 
-		const q = new URLSearchParams( params ).toString();
-		return getJSON<WindRose>( `/v1/windrose${ q ? '?' + q : '' }`, s );
+	const u = ( p: string ) => base + p;
+	return {
+		meta: ( s?: AbortSignal ) => getJSON<Meta>( u( '/v1/meta' ), s ),
+		/** Relief : Float32 LE ny*nx, m au-dessus de la mer, sans NaN. */
+		terrain: ( s?: AbortSignal ) => getFloat32( u( '/v1/terrain' ), s ),
+		latest: ( s?: AbortSignal ) => getJSON<Latest>( u( '/v1/latest' ), s ),
+		times: ( params: Record<string, string> = {}, s?: AbortSignal ) => {
 
-	},
-};
+			const q = new URLSearchParams( params ).toString();
+			return getJSON<Times>( u( `/v1/times${ q ? '?' + q : '' }` ), s );
+
+		},
+		snapshot: ( id: string, s?: AbortSignal ) => getJSON<Snapshot>( u( `/v1/snapshots/${ enc( id ) }` ), s ),
+		field: ( id: string, level: number, variable: FieldVar, s?: AbortSignal ) =>
+			getFloat32( u( `/v1/fields/${ enc( id ) }/${ level }/${ variable }` ), s ),
+		profile: ( id: string, xM: number, yM: number, s?: AbortSignal ) =>
+			getJSON<Profile>( u( `/v1/profiles/${ enc( id ) }?${ new URLSearchParams( { x_m: String( Math.round( xM ) ), y_m: String( Math.round( yM ) ) } ) }` ), s ),
+		quality: ( id: string, s?: AbortSignal ) => getJSON<Quality>( u( `/v1/quality/${ enc( id ) }` ), s ),
+		alerts: ( id: string, s?: AbortSignal ) => getJSON<Alerts>( u( `/v1/alerts/${ enc( id ) }` ), s ),
+		stations: ( id: string, s?: AbortSignal ) => getJSON<Stations>( u( `/v1/stations/${ enc( id ) }` ), s ),
+		windFarm: ( id: string, s?: AbortSignal ) => getJSON<WindFarm>( u( `/v1/wind-farm/${ enc( id ) }` ), s ),
+		windrose: ( params: { x_m: number; y_m: number; hub_agl_m: number; from?: string; to?: string }, s?: AbortSignal ) => {
+
+			const q = new URLSearchParams( Object.entries( params ).filter( ( [ , v ] ) => v != null ).map( ( [ k, v ] ): [ string, string ] => [ k, String( v ) ] ) );
+			return getJSON<WindRose>( u( `/v1/windrose?${ q }` ), s );
+
+		},
+	};
+
+}
+
+export type Api = ReturnType<typeof creerApi>;
+
+/** Client de même origine, utilisé par l'interface. */
+export const api = creerApi();
 
 /** Message court pour l'interface. */
 export function libelleErreur( e: unknown ): string {

@@ -1,32 +1,15 @@
-// Crochet de test exposé sur `window.__atom` (tests E2E Playwright, lot F5).
+// Implémentation du crochet de test `window.__atom` (interface : types/atom-hook.d.ts).
 //
-//   ready              : résolue quand la PREMIÈRE scène avec un champ est rendue ;
-//   scene              : la scène courante (Viz) ou null si la page 3D n'est pas montée ;
-//   setAltitude(m)     : choisit le niveau le plus proche de m (m au-dessus de la mer),
-//                        résout quand le champ de ce niveau est rendu ;
-//   pick(x, y)         : picking à (x, y) en px RELATIFS au coin haut-gauche du canevas,
-//                        résout avec { ix, iy, fx, fy, x_m, y_m } ou null hors domaine.
-//
-// L'interface est stable : la scène s'y enregistre via `brancherScene`.
+// La page « Exploration 3D » s'y enregistre via `brancherScene`, signale son premier rendu
+// (`signalerPremierRendu`) ou un échec de chargement (`signalerEchec`). `ready` est rejetée
+// au bout de DELAI_READY_MS si aucune scène n'a été rendue.
 
-import type { PickResult, Viz } from './viz';
+import type { AtomHook, AtomPick } from '../types/atom-hook';
+import type { Viz } from './viz';
 
-export interface AtomPick extends PickResult {
-	/** Position en mètres depuis le coin sud-ouest du domaine. */
-	x_m: number;
-	y_m: number;
-}
+export type { AtomHook, AtomPick };
 
-export interface AtomHook {
-	ready: Promise<void>;
-	readonly scene: Viz | null;
-	setAltitude( m: number ): Promise<void>;
-	pick( x: number, y: number ): Promise<unknown>;
-}
-
-declare global {
-	interface Window { __atom: AtomHook }
-}
+export const DELAI_READY_MS = 15_000;
 
 /** Ce qu'une page 3D montée fournit au crochet. */
 export interface ControleurScene {
@@ -36,17 +19,38 @@ export interface ControleurScene {
 }
 
 let courant: ControleurScene | null = null;
-let resoudreReady!: () => void;
-const ready = new Promise<void>( ( r ) => { resoudreReady = r; } );
+let regle = false;
+let derniereErreur: string | null = null;
+let resoudre!: () => void;
+let rejeter!: ( e: Error ) => void;
+let minuterie: ReturnType<typeof setTimeout> | null = null;
+
+const ready = new Promise<void>( ( ok, ko ) => { resoudre = ok; rejeter = ko; } );
+// Évite un « unhandledrejection » si personne n'attend `ready` (usage normal hors tests).
+ready.catch( () => {} );
+
+function regler( f: () => void ) {
+
+	if ( regle ) return;
+	regle = true;
+	if ( minuterie ) clearTimeout( minuterie );
+	f();
+
+}
 
 function controleur(): ControleurScene {
 
-	if ( ! courant ) throw new Error( 'scène non montée : ouvrir la page « Exploration 3D »' );
+	if ( ! courant ) throw new Error( 'scène non montée : ouvrir la page « Exploration 3D » (/exploration)' );
 	return courant;
 
 }
 
-export function installerCrochet(): AtomHook {
+export function installerCrochet( delaiMs = DELAI_READY_MS ): AtomHook {
+
+	minuterie = setTimeout( () => regler( () => rejeter( new Error(
+		`window.__atom.ready : aucune scène rendue en ${ Math.round( delaiMs / 1000 ) } s`
+		+ ( derniereErreur ? ` (dernière erreur : ${ derniereErreur })` : courant ? ' (données toujours en chargement)' : ' (page « Exploration 3D » non ouverte)' ),
+	) ) ), delaiMs );
 
 	const hook: AtomHook = {
 		ready,
@@ -68,4 +72,15 @@ export function brancherScene( c: ControleurScene ): () => void {
 }
 
 /** À appeler quand une scène avec champ vient d'être rendue (idempotent). */
-export function signalerPremierRendu() { resoudreReady(); }
+export function signalerPremierRendu() { regler( resoudre ); }
+
+/**
+ * Échec de chargement d'une donnée. `definitif` : la scène ne pourra pas s'afficher
+ * (ressource indispensable absente ou invalide) → `ready` est rejetée tout de suite.
+ */
+export function signalerEchec( message: string, definitif: boolean ) {
+
+	derniereErreur = message;
+	if ( definitif ) regler( () => rejeter( new Error( `window.__atom.ready : ${ message }` ) ) );
+
+}

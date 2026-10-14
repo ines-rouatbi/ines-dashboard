@@ -1,4 +1,4 @@
-// Profil vertical (ECharts) : médiane p50 et bornes p10 / p90 en fonction de l'altitude.
+// Profil vertical (ECharts) : vitesse (p50) et intervalle à 80 % (p10 / p90) selon l'altitude.
 
 import { useEffect, useRef } from 'react';
 import * as echarts from 'echarts/core';
@@ -21,21 +21,21 @@ export function ProfileChart( { niveaux }: { niveaux: ProfileLevel[] } ) {
 		if ( ! ref.current ) return;
 		const chart = echarts.init( ref.current, undefined, { renderer: 'canvas' } );
 		const valides = niveaux.filter( ( n ) => ! n.below_terrain );
-		const serie = ( cle: 'speed_p10' | 'speed_p50' | 'speed_p90' ) =>
-			valides.map( ( n ) => [ num( n[ cle ] ), n.z_m_asl ] ).filter( ( p ) => p[ 0 ] != null );
+		const serie = ( cle: 'p10' | 'p50' | 'p90' ) =>
+			valides.map( ( n ) => [ num( n.speed_interval[ cle ] ), n.z_asl_m ] ).filter( ( p ) => p[ 0 ] != null );
 
 		chart.setOption( {
 			animation: false,
 			textStyle: { fontFamily: 'Inter, system-ui, sans-serif', color: COULEURS.encre },
-			grid: { left: 46, right: 12, top: 26, bottom: 30 },
-			legend: { top: 0, right: 0, itemWidth: 14, itemHeight: 8, textStyle: { fontSize: 11 } },
+			grid: { left: 46, right: 24, top: 28, bottom: 48 },
+			legend: { bottom: 0, itemWidth: 14, itemHeight: 8, textStyle: { fontSize: 11 } },
 			tooltip: { trigger: 'axis', axisPointer: { type: 'line', axis: 'y' }, valueFormatter: ( v: unknown ) => typeof v === 'number' ? v.toFixed( 1 ) : String( v ) },
 			xAxis: { type: 'value', name: 'm/s', nameLocation: 'end', nameGap: 4, min: 0, splitLine: { lineStyle: { color: COULEURS.trait } } },
 			yAxis: { type: 'value', name: 'altitude (m, mer)', nameTextStyle: { align: 'left' }, splitLine: { lineStyle: { color: COULEURS.trait } } },
 			series: [
-				{ name: 'p10', type: 'line', data: serie( 'speed_p10' ), showSymbol: false, lineStyle: { type: 'dashed', width: 1, color: COULEURS.accent }, itemStyle: { color: COULEURS.accent } },
-				{ name: 'p50', type: 'line', data: serie( 'speed_p50' ), symbolSize: 5, lineStyle: { width: 2, color: COULEURS.encre }, itemStyle: { color: COULEURS.encre } },
-				{ name: 'p90', type: 'line', data: serie( 'speed_p90' ), showSymbol: false, lineStyle: { type: 'dashed', width: 1, color: COULEURS.accent }, itemStyle: { color: COULEURS.accent } },
+				{ name: 'p10', type: 'line', data: serie( 'p10' ), showSymbol: false, lineStyle: { type: 'dashed', width: 1, color: COULEURS.accent }, itemStyle: { color: COULEURS.accent } },
+				{ name: 'p50', type: 'line', data: serie( 'p50' ), symbolSize: 5, lineStyle: { width: 2, color: COULEURS.encre }, itemStyle: { color: COULEURS.encre } },
+				{ name: 'p90', type: 'line', data: serie( 'p90' ), showSymbol: false, lineStyle: { type: 'dashed', width: 1, color: COULEURS.accent }, itemStyle: { color: COULEURS.accent } },
 			],
 		} );
 		const ro = new ResizeObserver( () => chart.resize() );

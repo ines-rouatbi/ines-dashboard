@@ -16,7 +16,7 @@ function Pastille( { s }: { s: EtatLatest } ) {
 		const enLigne = s.latest.compute_status === 'online';
 		cls = enLigne ? 'pill pill-live' : 'pill pill-down';
 		txt = enLigne ? '● calcul en ligne' : '○ calcul arrêté';
-		titre = `Instantané ${ s.latest.snapshot_id } · modèle ${ s.latest.model_version }`;
+		titre = `Instantané ${ s.latest.snapshot_id } · modèle ${ s.latest.versions.model }`;
 
 	}
 

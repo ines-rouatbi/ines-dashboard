@@ -41,7 +41,7 @@ export interface SceneMeta {
 	sizeY?: number | null;
 }
 
-/** Résultat d'un picking : indices dans la grille affichée + fractions du domaine. */
+/** Résultat d'un picking : indices dans la grille AFFICHÉE (échantillonnée) + fractions du domaine. */
 export interface PickResult {
 	ix: number;
 	iy: number;
@@ -69,7 +69,7 @@ export class Viz {
 	pickPlane: THREE.Mesh | null = null;
 	marker: THREE.Mesh | null = null;
 	terrainGroup: THREE.Group | null = null;
-	fieldDims: { nx: number; ny: number } | null = null;
+	fieldDims: { nx: number; ny: number; nxNatif: number; nyNatif: number; stride: number } | null = null;
 	currentAltScene = 0;
 	/** Nombre d'images rendues depuis la création. */
 	frames = 0;
@@ -164,13 +164,15 @@ export class Viz {
 
 	private _altScene( alt: number ): number { const a = this.meta!.altitudes; const max = a[ a.length - 1 ] || 1000; return ( alt / max ) * H; }
 
-	private _cellToScene( ix: number, iy: number, yScene: number, gnx: number, gny: number ): THREE.Vector3 {
+	// Contrat v1 : nœuds au centre des mailles. Le nœud échantillonné (ix, iy) est le nœud
+	// natif (ix·stride, iy·stride), placé à la fraction (i + 0,5) / nx du domaine.
+	private _cellToScene( ix: number, iy: number, yScene: number, p: { nxNatif: number; nyNatif: number; stride: number } ): THREE.Vector3 {
 
 		const D = this.depth;
 		return new THREE.Vector3(
-			( ix / ( gnx - 1 || 1 ) - 0.5 ) * W,
+			( ( ix * p.stride + 0.5 ) / p.nxNatif - 0.5 ) * W,
 			yScene,
-			- ( iy / ( gny - 1 || 1 ) - 0.5 ) * D,
+			- ( ( iy * p.stride + 0.5 ) / p.nyNatif - 0.5 ) * D,
 		);
 
 	}
@@ -243,7 +245,7 @@ export class Viz {
 
 		if ( ! this.arrows || ! this.pickPlane ) return;
 		const { nx, ny, u, v, w, mask, altitude } = field;
-		this.fieldDims = { nx, ny };
+		this.fieldDims = { nx, ny, nxNatif: field.nxNatif, nyNatif: field.nyNatif, stride: field.stride };
 		// L'InstancedMesh est alloué sur un plafond ; on ne dessine que les nx*ny premières instances.
 		const max = this.arrows.instanceMatrix.count;
 		this.arrows.count = Math.min( nx * ny, max );
@@ -278,7 +280,7 @@ export class Viz {
 
 				const t = ( speed - lo ) / ( hi - lo || 1 );
 				const len = 1.6 + 3.8 * t;            // longueur par vitesse
-				const pos = this._cellToScene( ix, iy, y, nx, ny );
+				const pos = this._cellToScene( ix, iy, y, field );
 
 				this._dummy.position.copy( pos );
 				this._dummy.quaternion.copy( q );
@@ -330,8 +332,10 @@ export class Viz {
 		if ( fx < 0 || fx > 1 || fy < 0 || fy > 1 ) return null;
 		this.showMarker( fx, fy );
 		// Indices dans la grille affichée + fractions du domaine (pour convertir en mètres).
-		const ix = Math.round( fx * ( this.fieldDims.nx - 1 ) );
-		const iy = Math.round( fy * ( this.fieldDims.ny - 1 ) );
+		const g = this.fieldDims;
+		const borne = ( v: number, n: number ) => Math.min( n - 1, Math.max( 0, v ) );
+		const ix = borne( Math.round( ( fx * g.nxNatif - 0.5 ) / g.stride ), g.nx );
+		const iy = borne( Math.round( ( fy * g.nyNatif - 0.5 ) / g.stride ), g.ny );
 		const res = { ix, iy, fx, fy };
 		if ( this.onPick ) this.onPick( res );
 		return res;

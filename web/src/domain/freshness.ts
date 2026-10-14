@@ -7,7 +7,7 @@
 
 import type { Latest } from '../data/contract';
 
-export function calculArrete( latest: Pick<Latest, 'compute_status'> ): boolean {
+export function calculArrete( latest: { compute_status: Latest[ 'compute_status' ] | string } ): boolean {
 
 	return latest.compute_status !== 'online';
 
@@ -24,7 +24,7 @@ export function dateLocale( iso: string | null | undefined, locale = 'fr-FR', ti
 }
 
 /** Texte du bandeau, ou null si le calcul est en ligne. */
-export function texteBandeau( latest: Pick<Latest, 'compute_status' | 'generated_at'>, locale = 'fr-FR', timeZone?: string ): string | null {
+export function texteBandeau( latest: { compute_status: Latest[ 'compute_status' ] | string; generated_at: string }, locale = 'fr-FR', timeZone?: string ): string | null {
 
 	if ( ! calculArrete( latest ) ) return null;
 	return `Dernier état réel calculé le ${ dateLocale( latest.generated_at, locale, timeZone ) } — nouvelles reconstructions indisponibles`;

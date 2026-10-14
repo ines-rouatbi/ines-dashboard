@@ -93,7 +93,7 @@ body { background: var(--fond); color: var(--encre); }
 /* ---- Exploration 3D ---- */
 .exploration {
 	display: grid;
-	grid-template-columns: 280px 1fr 320px;
+	grid-template-columns: 280px 1fr 340px;
 	gap: 12px;
 	padding: 12px;
 	height: 100%;
@@ -151,10 +151,17 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .stats b { display: block; font-size: 18px; }
 .stats span { font-size: 11px; color: var(--encre-3); text-transform: uppercase; letter-spacing: .4px; }
 .stats p { grid-column: 1 / 4; }
-.graphe-profil { width: 100%; height: 220px; }
+.graphe-profil { width: 100%; height: 240px; }
 
 @media (max-width: 1100px) {
 	.exploration { grid-template-columns: 1fr; height: auto; }
 	.scene { height: 60vh; min-height: 360px; }
 	.topbar { gap: 12px; padding: 0 12px; }
 }
+
+/* ---- Tableau du profil vertical ---- */
+.panneau.tableau { overflow-x: hidden; }
+.tableau-profil { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+.tableau-profil th { text-align: right; font-weight: 600; color: var(--encre-2); border-bottom: 1px solid var(--trait); padding: 3px 4px; }
+.tableau-profil td { text-align: right; padding: 3px 3px; border-bottom: 1px solid #F0F3F5; }
+.tableau-profil tr.sous-relief td { color: var(--sable); }
