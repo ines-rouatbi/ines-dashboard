@@ -15,15 +15,14 @@ const scenario = process.env.ATOM_FIXTURE || 'normal';
 
 function fixturesV1(): Plugin {
 
-	// ATOM_FIXTURES_DIR permet de pointer un autre dossier (par défaut contract/fixtures).
-	const racine = resolve( ici, process.env.ATOM_FIXTURES_DIR || 'contract/fixtures' );
+	const racine = resolve( ici, 'contract/fixtures' );
 	const mw = () => middlewareFixtures( racine, scenario );
 	return {
 		name: 'atom-fixtures-v1',
 		configureServer( server ) {
 
 			server.middlewares.use( mw() );
-			server.config.logger.info( `  [atom] /v1/* servi depuis ${ racine }/${ scenario }/` );
+			server.config.logger.info( `  [atom] /v1/* servi depuis contract/fixtures/${ scenario }/` );
 
 		},
 		configurePreviewServer( server ) { server.middlewares.use( mw() ); },

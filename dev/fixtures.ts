@@ -32,6 +32,8 @@ export function cibleFixture( pathname: string ): CibleFixture | null {
 
 		case 'meta': return rest.length === 0 ? { fichier: 'meta.json', type: JSON_T } : null;
 		case 'latest': return rest.length === 0 ? { fichier: 'latest.json', type: JSON_T } : null;
+		case 'times': return rest.length === 0 ? { fichier: 'times.json', type: JSON_T } : null;
+		case 'terrain': return rest.length === 0 ? { fichier: 'terrain.f32', type: 'application/octet-stream' } : null;
 		case 'windrose': return rest.length === 0 ? { fichier: 'windrose.json', type: JSON_T } : null;
 		case 'snapshots': return rest.length === 1 ? { fichier: 'snapshot.json', type: JSON_T } : null;
 		case 'profiles': return rest.length === 1 ? { fichier: 'profile.json', type: JSON_T } : null;

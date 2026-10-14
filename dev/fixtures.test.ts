@@ -14,6 +14,8 @@ describe( 'cibleFixture', () => {
 		expect( cibleFixture( '/v1/stations/abc' )?.fichier ).toBe( 'stations.json' );
 		expect( cibleFixture( '/v1/wind-farm/abc' )?.fichier ).toBe( 'wind-farm.json' );
 		expect( cibleFixture( '/v1/windrose' )?.fichier ).toBe( 'windrose.json' );
+		expect( cibleFixture( '/v1/times' )?.fichier ).toBe( 'times.json' );
+		expect( cibleFixture( '/v1/terrain' ) ).toEqual( { fichier: 'terrain.f32', type: 'application/octet-stream' } );
 
 	} );
 
@@ -26,7 +28,7 @@ describe( 'cibleFixture', () => {
 
 	it( 'refuse les routes inconnues et les chemins douteux', () => {
 
-		expect( cibleFixture( '/v1/times' ) ).toBeNull();
+		expect( cibleFixture( '/v1/heartbeat' ) ).toBeNull();
 		expect( cibleFixture( '/v1/fields/abc/3' ) ).toBeNull();
 		expect( cibleFixture( '/v1/fields/abc/../meta' ) ).toBeNull();
 		expect( cibleFixture( '/api/meta' ) ).toBeNull();
