@@ -36,23 +36,26 @@ Document confidentiel, usage interne Tukhnanutha.
 - Points de synchronisation : chaque soir, chaque agent poste dans le salon (canal `general`, fil « ATOM ») ce qui est fait, ce qui bloque, et le prochain lot.
 - Les tâches sont suivies dans le tableau `/api/tasks` du salon (app = `atom`).
 
-## 3. Contrat v1 (lot 0, figé à J2)
+## 3. Contrat v1 (lot 0, figé à J2 ; révision 2 : `contract/DECISIONS-rev2.md`)
 
 **Points d'accès** (servis par le Worker depuis R2 ; le service Python les produit) :
 
 | Point d'accès | Contenu |
 |---|---|
-| `GET /v1/meta` | Grille 500×250×12, niveaux au-dessus du niveau de la mer, domaine, repère, ancrage (signalé « supposé »), relief (lien binaire), unités |
-| `GET /v1/latest` | Manifeste : `snapshot_id`, `valid_time`, `generated_at`, `published_at`, `last_observation_at`, `model_version`, `norm_version`, `data_version`, `compute_status`, `data_status` |
+| `GET /v1/meta`, `/v1/meta/{sha8}` | Fichier par modèle : grille 500×250×12 (nœuds en `x0 + i·dx`, `min_agl_m`), niveaux au-dessus du niveau de la mer, domaine, géoréférencement (signalé « supposé »), codage des champs, unités, versions |
+| `GET /v1/terrain/{sha8}` | Relief du modèle, Float32 little-endian, immuable |
+| `GET /v1/latest` | Manifeste : `snapshot_id`, `valid_time`, `generated_at`, `published_at`, `last_observation_at`, `versions` (modèle et son sha256, norm, données, `data_kind`), `compute_status`, `data_status` |
 | `GET /v1/times?from&to` | Instantanés disponibles (paginé) |
 | `GET /v1/snapshots/{id}` | Résumé, indicateurs clés, DSO de l'instant (résidu de masse, condition au sol), liens vers les ressources |
-| `GET /v1/fields/{id}/{level}/{var}` | Binaire Float32 little-endian, `[j][i]` du sud au nord puis d'ouest en est, NaN sous le relief. Variables : `u v w speed sigma_u sigma_v coverage reliability status` |
-| `GET /v1/profiles/{id}?x&y` | Profil vertical avec p10, p50 et p90, statut, couverture, station la plus proche |
+| `GET /v1/fields/{id}/{level}/{var}` | Un niveau, lu par le Worker dans le fichier tous niveaux de la variable : Float32 little-endian ou uint8 (en-tête `x-atom-dtype`), `[j][i]` du sud au nord puis d'ouest en est, absent si `z − relief < min_agl_m`. Variables : `u v w speed sigma_speed sigma_u sigma_v sigma_w coverage reliability status` |
+| `GET /v1/column/{id}?i&j` | Valeurs brutes d'une colonne à tous les niveaux (profil au clic, calculé par le front) |
+| `GET /v1/profiles/{id}/{point_id}` | Profil vertical précalculé aux points déclarés, avec p10, p50 et p90, statut, couverture, capteur le plus proche |
 | `GET /v1/quality/{id}` | Carte de confiance agrégée, répartition des nœuds, calibration (`calibrated: true/false`) |
 | `GET /v1/alerts/{id}` | Alertes : niveau, cause, recommandation, horodatage |
-| `GET /v1/stations/{id}` | Stations : position, état (active, suspecte, muette, en dérive), dernière mesure |
+| `GET /v1/stations/{id}` | Capteurs : position, état (active, suspecte, muette, en dérive), dernière mesure ; en treillis synthétique, seulement les capteurs signalés |
+| `GET /v1/data-quality/{id}` | Qualité des données d'entrée (rapport de M3) |
 | `GET /v1/wind-farm/{id}` | Éoliennes, vent au moyeu, vent équivalent rotor, cisaillement, puissance [p10, p90], état ; production du parc |
-| `GET /v1/windrose?x&y&hub&from&to` | Rose des vents et Weibull (k, c), avec le **nombre d'instants valides** |
+| `GET /v1/windrose/{site_id}` | Rose des vents et Weibull (k, c) précalculées aux sites déclarés, avec leur période et le **nombre d'instants valides** |
 
 **Sémantique obligatoire :**
 - Direction = d'où vient le vent, `(270 − atan2(v,u)) mod 360`. Elle est **indéfinie** si la vitesse est inférieure à 0,2 m/s.
