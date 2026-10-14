@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info:
+  title: ATOM-AI — contrat v1 (tableau de bord atom.zelqane.com)
+  version: "1.0"
+  description: |
+    Contrat entre le service PC-FNO3D (ines-pc / Colab) et le tableau de bord (Worker Cloudflare + R2).
+    Le service PUBLIE des instantanés immuables dans R2 via /v1/publish ; le tableau de bord ne LIT que /v1/*.
+    Conventions : u vers l'Est, v vers le Nord, w vers le haut ; direction météo = d'où vient le vent,
+    (270 − atan2(v,u)) mod 360, null si vitesse < 0,2 m/s ; altitudes en m AU-DESSUS DE LA MER ;
+    sous le relief : null en JSON, NaN dans les binaires Float32 little-endian (index = j*nx + i, j=0 au sud).
+    Confidentiel — usage interne Tukhnanutha.
+servers:
+  - url: https://atom.zelqane.com
+paths:
+  /v1/meta:
+    get:
+      summary: Géométrie du domaine, niveaux, géoréférencement (supposé ou non), relief
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/meta.schema.json" } } } } }
+  /v1/terrain:
+    get:
+      summary: Relief, Float32 LE ny*nx, m au-dessus de la mer (statique par version de modèle)
+      responses: { "200": { description: OK, content: { application/octet-stream: {} } } }
+  /v1/latest:
+    get:
+      summary: Dernier instantané publié ; compute_status calculé par le Worker (battement de cœur < 5 min → online)
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/latest.schema.json" } } } }, "404": { description: Aucun instantané publié } }
+  /v1/times:
+    get:
+      summary: Instantanés publiés, paginés
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/times.schema.json" } } } } }
+  /v1/snapshots/{id}:
+    get:
+      summary: Résumé, indicateurs clés, physique, liens des ressources
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/snapshot.schema.json" } } } }, "404": { description: Inconnu } }
+  /v1/fields/{id}/{level}/{var}:
+    get:
+      summary: Champ 2D d'un niveau (indice 0..nz-1), Float32 LE ny*nx, NaN sous le relief
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: level, in: path, required: true, schema: { type: integer, minimum: 0 } }
+        - { name: var, in: path, required: true, schema: { enum: [u, v, w, speed, sigma_u, sigma_v, sigma_w, coverage, reliability, status] } }
+      responses: { "200": { description: OK, headers: { Cache-Control: { schema: { type: string }, description: "public, max-age=31536000, immutable" } }, content: { application/octet-stream: {} } } }
+  /v1/profiles/{id}:
+    get:
+      summary: Profil vertical avec intervalle p10–p90, statut, couverture, fiabilité, station la plus proche
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: x_m, in: query, required: true, schema: { type: number } }
+        - { name: y_m, in: query, required: true, schema: { type: number } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/profile.schema.json" } } } } }
+  /v1/quality/{id}:
+    get:
+      summary: Fiabilité agrégée par niveau, méthode d'incertitude, calibration (DSO6)
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/quality.schema.json" } } } } }
+  /v1/alerts/{id}:
+    get:
+      summary: Alertes (4 niveaux) avec cause et recommandation
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/alerts.schema.json" } } } } }
+  /v1/stations/{id}:
+    get:
+      summary: État des stations ANEO (active, suspecte, muette, dérive, exclue)
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/stations.schema.json" } } } } }
+  /v1/wind-farm/{id}:
+    get:
+      summary: Éoliennes (moyeu, REWS, cisaillement, puissance p10–p90, état) et production du parc
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/wind-farm.schema.json" } } } } }
+  /v1/windrose:
+    get:
+      summary: Rose des vents et Weibull à hauteur de moyeu sur une période (n_valid obligatoire)
+      parameters:
+        - { name: x_m, in: query, required: true, schema: { type: number } }
+        - { name: y_m, in: query, required: true, schema: { type: number } }
+        - { name: hub_agl_m, in: query, required: true, schema: { type: number } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/windrose.schema.json" } } } } }
+  /v1/publish/{id}/{path}:
+    put:
+      summary: (service GPU) Dépose un fichier de l'instantané. Idempotent si même sha256. 8 Mo max.
+      security: [ { publishToken: [] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: path, in: path, required: true, schema: { type: string } }
+        - { name: X-Content-SHA256, in: header, required: true, schema: { type: string } }
+      responses: { "200": { description: Déjà présent, identique }, "201": { description: Créé }, "409": { description: Instantané déjà commité (immuable) ou sha256 différent }, "413": { description: Trop gros } }
+  /v1/publish/{id}/commit:
+    post:
+      summary: (service GPU) Vérifie tous les fichiers (taille + sha256) puis bascule latest. Refus si un fichier manque.
+      security: [ { publishToken: [] } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "schemas/publish-manifest.schema.json" } } } }
+      responses: { "200": { description: latest basculé }, "422": { description: Fichier manquant ou altéré, latest inchangé } }
+  /v1/heartbeat:
+    post:
+      summary: (service GPU) Battement de cœur, toutes les 60 s quand le service tourne
+      security: [ { publishToken: [] } ]
+      responses: { "204": { description: OK } }
+components:
+  securitySchemes:
+    publishToken: { type: http, scheme: bearer, description: "Jeton de publication remis hors salon ; secret Colab / variable d'environnement, jamais dans git" }
