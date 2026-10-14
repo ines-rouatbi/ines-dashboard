@@ -2,8 +2,8 @@
 //
 // Les instantanés sont immuables : un champ chargé une fois reste valable. Le cache ne
 // garde qu'UN instantané à la fois (changer d'instantané le vide) pour borner la mémoire
-// (grille v7 : 500 × 250 × 4 o = 0,5 Mo par champ). Les requêtes sont limitées en
-// parallèle pour ne pas saturer le navigateur lors du chargement d'un profil (12 niveaux).
+// (grille v7 : 500 × 250 × 4 o = 0,5 Mo par niveau d'une variable float32). Les requêtes
+// sont limitées en parallèle. Le profil au clic ne passe pas par ici : il lit /v1/column.
 
 import type { Api } from './api';
 import type { FieldVar } from './contract';
@@ -14,7 +14,6 @@ export class CacheChamps {
 	private readonly promesses = new Map<string, Promise<Float32Array>>();
 	private actives = 0;
 	private readonly file: ( () => void )[] = [];
-	private terrainP: Promise<Float32Array> | null = null;
 	private readonly client: Api;
 	private readonly maxParalleles: number;
 
@@ -42,14 +41,15 @@ export class CacheChamps {
 
 	}
 
-	champ( id: string, niveau: number, variable: FieldVar ): Promise<Float32Array> {
+	/** `scale` = meta.encoding[variable].scale (variables uint8 ; ignoré pour float32). */
+	champ( id: string, niveau: number, variable: FieldVar, scale?: number | null ): Promise<Float32Array> {
 
 		if ( id !== this.instantane ) { this.instantane = id; this.promesses.clear(); }
 		const cle = `${ niveau }/${ variable }`;
 		let p = this.promesses.get( cle );
 		if ( ! p ) {
 
-			p = this.creneau( () => this.client.field( id, niveau, variable ) );
+			p = this.creneau( () => this.client.field( id, niveau, variable, scale ) );
 			// Une erreur n'est pas mise en cache : on pourra réessayer.
 			p.catch( () => { if ( this.promesses.get( cle ) === p ) this.promesses.delete( cle ); } );
 			this.promesses.set( cle, p );
@@ -57,21 +57,6 @@ export class CacheChamps {
 		}
 
 		return p;
-
-	}
-
-	/** Relief (statique par version de modèle). */
-	terrain(): Promise<Float32Array> {
-
-		if ( ! this.terrainP ) {
-
-			const p = this.client.terrain();
-			p.catch( () => { if ( this.terrainP === p ) this.terrainP = null; } );
-			this.terrainP = p;
-
-		}
-
-		return this.terrainP;
 
 	}
 

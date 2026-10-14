@@ -165,3 +165,13 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .tableau-profil th { text-align: right; font-weight: 600; color: var(--encre-2); border-bottom: 1px solid var(--trait); padding: 3px 4px; }
 .tableau-profil td { text-align: right; padding: 3px 3px; border-bottom: 1px solid #F0F3F5; }
 .tableau-profil tr.sous-relief td { color: var(--sable); }
+
+/* ---- Badge de nature des données (versions.data_kind) ---- */
+.badge-nature {
+	font-size: 12px; font-weight: 600; white-space: nowrap;
+	padding: 5px 10px; border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, .25); color: #fff;
+}
+.badge-nature.nature-test { background: var(--sable); border-color: var(--sable); color: var(--encre); }
+.badge-nature.nature-synthetique { background: rgba(184, 146, 90, .25); border-color: var(--sable); }
+.badge-nature.nature-reel { background: var(--accent); border-color: var(--accent); }

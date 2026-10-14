@@ -1,8 +1,8 @@
 // Préparation d'un plan (un niveau) pour la scène : échantillonnage et masque du relief.
 //
 // Entrée : grilles natives Float32 [j][i] (j = sud→nord, i = ouest→est), NaN = sous le relief.
-// Les nœuds sont au CENTRE des mailles : x_i = (i + 0,5)·dx, y_j = (j + 0,5)·dy, et le
-// domaine couvre [0, nx·dx] × [0, ny·dy] depuis le coin sud-ouest (contrat v1).
+// Contrat v1 rév. 2 : le nœud (i, j) est en x = x0 + i·dx, y = y0 + j·dy ; le domaine va du
+// nœud (0, 0) au nœud (nx−1, ny−1). Un nœud existe ssi z_asl − relief ≥ grid.min_agl_m.
 // Sortie : grille échantillonnée (pas `stride`), même convention d'index j * nx + i.
 
 import type { Meta } from '../data/contract';
@@ -12,7 +12,7 @@ export interface Plan {
 	/** Taille de la grille échantillonnée. */
 	nx: number;
 	ny: number;
-	/** Taille de la grille native (pour placer chaque nœud au centre de sa maille). */
+	/** Taille de la grille native (pour placer chaque nœud échantillonné). */
 	nxNatif: number;
 	nyNatif: number;
 	dx: number;
@@ -32,7 +32,12 @@ export interface Domaine {
 	nz: number;
 	dx: number;
 	dy: number;
-	/** Étendue Est (m) et Nord (m) du domaine, depuis le coin sud-ouest. */
+	/** Position du nœud (0, 0), en m. */
+	x0: number;
+	y0: number;
+	/** Hauteur minimale au-dessus du sol d'un nœud existant, en m. */
+	minAgl: number;
+	/** Étendue Est (m) et Nord (m) entre le premier et le dernier nœud : (n − 1)·d. */
 	sizeX: number;
 	sizeY: number;
 	/** Altitudes des niveaux, m au-dessus de la mer ; l'indice est le {level} de /v1/fields. */
@@ -41,23 +46,26 @@ export interface Domaine {
 
 export function domaineDepuisMeta( meta: Meta ): Domaine {
 
-	const { nx, ny, nz, dx_m, dy_m, levels_asl_m } = meta.grid;
-	return { nx, ny, nz: nz ?? levels_asl_m.length, dx: dx_m, dy: dy_m, sizeX: nx * dx_m, sizeY: ny * dy_m, altitudes: [ ...levels_asl_m ] };
+	const { nx, ny, nz, dx_m, dy_m, x0_m, y0_m, min_agl_m, levels_asl_m } = meta.grid;
+	return {
+		nx, ny, nz: nz ?? levels_asl_m.length, dx: dx_m, dy: dy_m, x0: x0_m, y0: y0_m, minAgl: min_agl_m,
+		sizeX: ( nx - 1 ) * dx_m, sizeY: ( ny - 1 ) * dy_m, altitudes: [ ...levels_asl_m ],
+	};
 
 }
 
-/** Maille native contenant le point (x_m, y_m), bornée au domaine. */
-export function mailleDe( dom: Pick<Domaine, 'nx' | 'ny' | 'dx' | 'dy'>, xM: number, yM: number ): { i: number; j: number } {
+/** Nœud natif le plus proche du point (x_m, y_m), borné au domaine. */
+export function noeudProche( dom: Pick<Domaine, 'nx' | 'ny' | 'dx' | 'dy' | 'x0' | 'y0'>, xM: number, yM: number ): { i: number; j: number } {
 
-	const c = ( v: number, n: number ) => Math.min( n - 1, Math.max( 0, Math.floor( v ) ) );
-	return { i: c( xM / dom.dx, dom.nx ), j: c( yM / dom.dy, dom.ny ) };
+	const c = ( v: number, n: number ) => Math.min( n - 1, Math.max( 0, Math.round( v ) ) );
+	return { i: c( ( xM - dom.x0 ) / dom.dx, dom.nx ), j: c( ( yM - dom.y0 ) / dom.dy, dom.ny ) };
 
 }
 
-/** Centre (m) de la maille native (i, j). */
-export function centreMaille( dom: Pick<Domaine, 'dx' | 'dy'>, i: number, j: number ): { x_m: number; y_m: number } {
+/** Position (m) du nœud natif (i, j). */
+export function positionNoeud( dom: Pick<Domaine, 'dx' | 'dy' | 'x0' | 'y0'>, i: number, j: number ): { x_m: number; y_m: number } {
 
-	return { x_m: ( i + 0.5 ) * dom.dx, y_m: ( j + 0.5 ) * dom.dy };
+	return { x_m: dom.x0 + i * dom.dx, y_m: dom.y0 + j * dom.dy };
 
 }
 

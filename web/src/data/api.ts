@@ -3,9 +3,9 @@
 // Règle : jamais de données de démo. Une ressource absente ou invalide remonte comme
 // une erreur typée (`ApiError`), que l'interface affiche « indisponible ».
 
-import { decodeFloat32LE } from './binary';
+import { decodeFloat32LE, decodeNiveau } from './binary';
 import type {
-	Alerts, FieldVar, Latest, Meta, Profile, Quality, Snapshot, Stations, Times, WindFarm, WindRose,
+	Alerts, Column, DataQuality, FieldVar, Latest, Meta, Profile, Quality, Snapshot, Stations, Times, WindFarm, WindRose,
 } from './contract';
 
 export type CodeErreur = 'absent' | 'http' | 'reseau' | 'invalide';
@@ -74,7 +74,11 @@ export async function getJSON<T>( url: string, signal?: AbortSignal ): Promise<T
 
 }
 
-export async function getFloat32( url: string, signal?: AbortSignal ): Promise<Float32Array> {
+/**
+ * Binaire d'un niveau ou du relief, décodé en Float32Array (NaN = absent). Le type vient de
+ * l'en-tête `x-atom-dtype` (float32 par défaut) ; `scale` = meta.encoding[var].scale pour uint8.
+ */
+export async function getFloat32( url: string, signal?: AbortSignal, scale?: number | null ): Promise<Float32Array> {
 
 	const r = await requete( url, 'application/octet-stream', signal );
 	const type = r.headers.get( 'content-type' ) ?? '';
@@ -85,22 +89,25 @@ export async function getFloat32( url: string, signal?: AbortSignal ): Promise<F
 
 	}
 
-	try { return decodeFloat32LE( await r.arrayBuffer() ); }
+	const dtype = r.headers.get( 'x-atom-dtype' );
+	try { return dtype ? decodeNiveau( await r.arrayBuffer(), dtype, scale ) : decodeFloat32LE( await r.arrayBuffer() ); }
 	catch ( e ) { throw new ApiError( 'invalide', `${ url } : ${ ( e as Error ).message }`, r.status ); }
 
 }
 
 /**
- * Points d'accès du contrat v1. `base` = origine du serveur ('' = même origine).
- * `level` = indice du niveau (0..nz-1).
+ * Points d'accès de lecture du contrat v1 (révision 2). `base` = origine du serveur ('' = même
+ * origine). `level` = indice du niveau (0..nz-1). Les liens d'un instantané sont aussi donnés par
+ * `snapshot.assets` ; le relief par `meta.terrain.href`.
  */
 export function creerApi( base = '' ) {
 
 	const u = ( p: string ) => base + p;
 	return {
-		meta: ( s?: AbortSignal ) => getJSON<Meta>( u( '/v1/meta' ), s ),
-		/** Relief : Float32 LE ny*nx, m au-dessus de la mer, sans NaN. */
-		terrain: ( s?: AbortSignal ) => getFloat32( u( '/v1/terrain' ), s ),
+		/** Meta du modèle de latest, ou d'un modèle précis (sha8). */
+		meta: ( sha8?: string, s?: AbortSignal ) => getJSON<Meta>( u( sha8 ? `/v1/meta/${ enc( sha8 ) }` : '/v1/meta' ), s ),
+		/** Relief : Float32 LE ny·nx, m au-dessus de la mer, sans NaN. `href` = meta.terrain.href. */
+		terrain: ( href: string, s?: AbortSignal ) => getFloat32( u( href ), s ),
 		latest: ( s?: AbortSignal ) => getJSON<Latest>( u( '/v1/latest' ), s ),
 		times: ( params: Record<string, string> = {}, s?: AbortSignal ) => {
 
@@ -109,20 +116,24 @@ export function creerApi( base = '' ) {
 
 		},
 		snapshot: ( id: string, s?: AbortSignal ) => getJSON<Snapshot>( u( `/v1/snapshots/${ enc( id ) }` ), s ),
-		field: ( id: string, level: number, variable: FieldVar, s?: AbortSignal ) =>
-			getFloat32( u( `/v1/fields/${ enc( id ) }/${ level }/${ variable }` ), s ),
-		profile: ( id: string, xM: number, yM: number, s?: AbortSignal ) =>
-			getJSON<Profile>( u( `/v1/profiles/${ enc( id ) }?${ new URLSearchParams( { x_m: String( Math.round( xM ) ), y_m: String( Math.round( yM ) ) } ) }` ), s ),
+		/** Un niveau d'une variable ; `scale` = meta.encoding[var].scale (variables uint8). */
+		field: ( id: string, level: number, variable: FieldVar, scale?: number | null, s?: AbortSignal ) =>
+			getFloat32( u( `/v1/fields/${ enc( id ) }/${ level }/${ variable }` ), s, scale ),
+		/** Valeurs brutes de la colonne (i, j) : base du profil au clic, calculé par le front. */
+		column: ( id: string, i: number, j: number, s?: AbortSignal ) =>
+			getJSON<Column>( u( `/v1/column/${ enc( id ) }?${ new URLSearchParams( { i: String( i ), j: String( j ) } ) }` ), s ),
+		/** Profil précalculé en un point déclaré (snapshot.points[].profile). */
+		profile: ( id: string, pointId: string, s?: AbortSignal ) =>
+			getJSON<Profile>( u( `/v1/profiles/${ enc( id ) }/${ enc( pointId ) }` ), s ),
 		quality: ( id: string, s?: AbortSignal ) => getJSON<Quality>( u( `/v1/quality/${ enc( id ) }` ), s ),
 		alerts: ( id: string, s?: AbortSignal ) => getJSON<Alerts>( u( `/v1/alerts/${ enc( id ) }` ), s ),
 		stations: ( id: string, s?: AbortSignal ) => getJSON<Stations>( u( `/v1/stations/${ enc( id ) }` ), s ),
 		windFarm: ( id: string, s?: AbortSignal ) => getJSON<WindFarm>( u( `/v1/wind-farm/${ enc( id ) }` ), s ),
-		windrose: ( params: { x_m: number; y_m: number; hub_agl_m: number; from?: string; to?: string }, s?: AbortSignal ) => {
-
-			const q = new URLSearchParams( Object.entries( params ).filter( ( [ , v ] ) => v != null ).map( ( [ k, v ] ): [ string, string ] => [ k, String( v ) ] ) );
-			return getJSON<WindRose>( u( `/v1/windrose?${ q }` ), s );
-
-		},
+		/** Rapport de qualité des données d'entrée (M3). */
+		dataQuality: ( id: string, s?: AbortSignal ) => getJSON<DataQuality>( u( `/v1/data-quality/${ enc( id ) }` ), s ),
+		/** Rose des vents précalculée d'un site ou d'une éolienne déclarés (latest par défaut). */
+		windrose: ( siteId: string, snapshotId?: string, s?: AbortSignal ) =>
+			getJSON<WindRose>( u( `/v1/windrose/${ enc( siteId ) }${ snapshotId ? '?' + new URLSearchParams( { snapshot: snapshotId } ) : '' }` ), s ),
 	};
 
 }

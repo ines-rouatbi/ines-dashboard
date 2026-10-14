@@ -164,15 +164,15 @@ export class Viz {
 
 	private _altScene( alt: number ): number { const a = this.meta!.altitudes; const max = a[ a.length - 1 ] || 1000; return ( alt / max ) * H; }
 
-	// Contrat v1 : nœuds au centre des mailles. Le nœud échantillonné (ix, iy) est le nœud
-	// natif (ix·stride, iy·stride), placé à la fraction (i + 0,5) / nx du domaine.
+	// Contrat v1 rév. 2 : nœud (i, j) en x0 + i·dx. Le nœud échantillonné (ix, iy) est le nœud
+	// natif (ix·stride, iy·stride), placé à la fraction i / (nx − 1) du domaine (nœud 0 → bord ouest).
 	private _cellToScene( ix: number, iy: number, yScene: number, p: { nxNatif: number; nyNatif: number; stride: number } ): THREE.Vector3 {
 
 		const D = this.depth;
 		return new THREE.Vector3(
-			( ( ix * p.stride + 0.5 ) / p.nxNatif - 0.5 ) * W,
+			( ( ix * p.stride ) / ( p.nxNatif - 1 || 1 ) - 0.5 ) * W,
 			yScene,
-			- ( ( iy * p.stride + 0.5 ) / p.nyNatif - 0.5 ) * D,
+			- ( ( iy * p.stride ) / ( p.nyNatif - 1 || 1 ) - 0.5 ) * D,
 		);
 
 	}
@@ -334,8 +334,8 @@ export class Viz {
 		// Indices dans la grille affichée + fractions du domaine (pour convertir en mètres).
 		const g = this.fieldDims;
 		const borne = ( v: number, n: number ) => Math.min( n - 1, Math.max( 0, v ) );
-		const ix = borne( Math.round( ( fx * g.nxNatif - 0.5 ) / g.stride ), g.nx );
-		const iy = borne( Math.round( ( fy * g.nyNatif - 0.5 ) / g.stride ), g.ny );
+		const ix = borne( Math.round( fx * ( g.nxNatif - 1 ) / g.stride ), g.nx );
+		const iy = borne( Math.round( fy * ( g.nyNatif - 1 ) / g.stride ), g.ny );
 		const res = { ix, iy, fx, fy };
 		if ( this.onPick ) this.onPick( res );
 		return res;

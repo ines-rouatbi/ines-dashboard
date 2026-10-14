@@ -24,6 +24,20 @@ function Pastille( { s }: { s: EtatLatest } ) {
 
 }
 
+const LIBELLE_NATURE: Record<string, string> = { test: 'test', synthetique: 'synthétique', reel: 'réel' };
+
+/** Nature des données (versions.data_kind), affichée en permanence (contrat rév. 2, D15). */
+function BadgeNature( { s }: { s: EtatLatest } ) {
+
+	const kind = s.etat === 'ok' ? s.latest.versions.data_kind : null;
+	const txt = kind ? `données : ${ LIBELLE_NATURE[ kind ] ?? kind }` : 'données : —';
+	const titre = kind === 'test' ? 'Instantané de test : ce ne sont pas des résultats du modèle'
+		: kind === 'synthetique' ? 'Données synthétiques (capteurs simulés)'
+			: kind === 'reel' ? 'Données réelles (réseau de mesure)' : 'Nature des données inconnue';
+	return <span className={ `badge-nature nature-${ kind ?? 'inconnue' }` } title={ titre } data-testid="data-kind">{ txt }</span>;
+
+}
+
 function Bandeau( { s }: { s: EtatLatest } ) {
 
 	if ( s.etat !== 'ok' ) return null;
@@ -65,6 +79,7 @@ export function App() {
 						>{ r.titre }</a>
 					) ) }
 				</nav>
+				<BadgeNature s={ latest } />
 				<Pastille s={ latest } />
 			</header>
 			<Bandeau s={ latest } />

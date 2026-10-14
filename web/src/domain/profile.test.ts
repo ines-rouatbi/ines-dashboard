@@ -1,35 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { intervalle80, niveauProfil, profilColonne, sigmaVitesse, Z80, type ValeursNoeud } from './profile';
+import { intervalle80, niveauDepuisColonne, profilDepuisColonne, Z80 } from './profile';
+import type { Column, ColumnLevel } from '../data/contract';
 
-const noeud = ( o: Partial<ValeursNoeud> ): ValeursNoeud => ( {
-	u: NaN, v: NaN, w: NaN, speed: NaN, sigma_u: NaN, sigma_v: NaN, coverage: NaN, reliability: NaN, status: NaN, ...o,
+const niveau = ( o: Partial<ColumnLevel> ): ColumnLevel => ( {
+	z_asl_m: 650, z_agl_m: 500, below_terrain: false,
+	u: null, v: null, w: null, speed: null, sigma_speed: null, coverage: null, reliability: null, status: null, ...o,
 } );
 
-describe( 'profil calculé côté client', () => {
+describe( 'profil calculé par le front depuis /v1/column', () => {
 
-	it( 'σ propagé depuis σu, σv', () => {
-
-		// Vent d'ouest pur : σ = σu.
-		expect( sigmaVitesse( 5, 0, 0.4, 0.9, 5 ) ).toBeCloseTo( 0.4, 12 );
-		// Vent du sud pur : σ = σv.
-		expect( sigmaVitesse( 0, 5, 0.4, 0.9, 5 ) ).toBeCloseTo( 0.9, 12 );
-		// Calme : moyenne quadratique.
-		expect( sigmaVitesse( 0, 0, 0.3, 0.4, 0 ) ).toBeCloseTo( Math.sqrt( 0.125 ), 12 );
-
-	} );
-
-	it( 'intervalle à 80 % borné à 0', () => {
+	it( 'intervalle à 80 % = speed ± 1,2816·sigma_speed, borné à 0', () => {
 
 		expect( intervalle80( 5, 1 ) ).toEqual( { p10: 5 - Z80, p50: 5, p90: 5 + Z80 } );
 		expect( intervalle80( 0.5, 1 ).p10 ).toBe( 0 );
+		expect( intervalle80( 5, null ) ).toEqual( { p10: null, p50: null, p90: null } );
 
 	} );
 
-	it( 'niveau valide : direction, statut, intervalle ordonné, hauteur sol', () => {
+	it( 'niveau valide : direction, statut, intervalle', () => {
 
-		const l = niveauProfil( 650, 150, noeud( { u: 0, v: -5, w: 0.1, speed: 5, sigma_u: 0.3, sigma_v: 0.5, coverage: 0.8, reliability: 0.7, status: 1 } ) );
+		const l = niveauDepuisColonne( niveau( { u: 0, v: -5, w: 0.1, speed: 5, sigma_speed: 0.5, coverage: 0.8, reliability: 0.7, status: 1 } ) );
 		expect( l.below_terrain ).toBe( false );
-		expect( l.agl_m ).toBe( 500 );
+		expect( l.z_agl_m ).toBe( 500 );
 		expect( l.dir_from_deg ).toBeCloseTo( 0, 9 );
 		expect( l.status ).toBe( 'mesure' );
 		expect( l.speed_interval.p50 ).toBe( 5 );
@@ -39,29 +31,31 @@ describe( 'profil calculé côté client', () => {
 
 	} );
 
-	it( 'NaN = sous le relief', () => {
+	it( 'sans sigma : p50 = speed, bornes inconnues ; statut estimé', () => {
 
-		const l = niveauProfil( 25, 150, noeud( {} ) );
-		expect( l.below_terrain ).toBe( true );
-		expect( l.agl_m ).toBe( -125 );
-		expect( l.speed ).toBeNull();
-		expect( l.dir_from_deg ).toBeNull();
+		const l = niveauDepuisColonne( niveau( { u: 3, v: 4, speed: 5, status: 0 } ) );
+		expect( l.speed_interval ).toEqual( { p10: null, p50: 5, p90: null } );
+		expect( l.status ).toBe( 'estime' );
 
 	} );
 
-	it( 'assemble une colonne au centre de la maille', () => {
+	it( 'sous le relief : tout null', () => {
 
-		const dom = { nx: 2, ny: 1, dx: 500, dy: 500, altitudes: [ 100, 200 ] };
-		const f = ( a: number[] ) => Float32Array.from( a );
-		const champs = [
-			{ u: f( [ NaN, NaN ] ), v: f( [ NaN, NaN ] ), speed: f( [ NaN, NaN ] ) },
-			{ u: f( [ 1, 3 ] ), v: f( [ 0, 4 ] ), speed: f( [ 1, 5 ] ), status: f( [ 0, 0 ] ) },
-		];
-		const p = profilColonne( dom, 1, 0, champs, f( [ 120, 150 ] ) );
-		expect( [ p.x_m, p.y_m, p.z_terrain_m ] ).toEqual( [ 750, 250, 150 ] );
+		const l = niveauDepuisColonne( niveau( { z_asl_m: 25, z_agl_m: -125, below_terrain: true } ) );
+		expect( l.below_terrain ).toBe( true );
+		expect( l.speed ).toBeNull();
+		expect( l.dir_from_deg ).toBeNull();
+		expect( l.speed_interval ).toEqual( { p10: null, p50: null, p90: null } );
+
+	} );
+
+	it( 'profil complet', () => {
+
+		const c = { i: 2, j: 1, x_m: 1000, y_m: 500, z_terrain_m: 150, levels: [ niveau( { below_terrain: true } ), niveau( { u: 1, v: 0, speed: 1, sigma_speed: 0.1 } ) ] } as unknown as Column;
+		const p = profilDepuisColonne( c );
+		expect( [ p.i, p.j, p.x_m, p.y_m, p.z_terrain_m ] ).toEqual( [ 2, 1, 1000, 500, 150 ] );
 		expect( p.levels.map( ( l ) => l.below_terrain ) ).toEqual( [ true, false ] );
-		expect( p.levels[ 1 ].speed ).toBe( 5 );
-		expect( p.levels[ 1 ].status ).toBe( 'estime' );
+		expect( p.levels[ 1 ].dir_from_deg ).toBeCloseTo( 270, 9 );
 
 	} );
 

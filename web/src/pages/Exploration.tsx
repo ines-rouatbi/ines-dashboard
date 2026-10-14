@@ -1,15 +1,17 @@
-// Page « Exploration 3D » : monte la scène portée (scene/viz.ts) sur les données /v1.
+// Page « Exploration 3D » : monte la scène portée (scene/viz.ts) sur les données /v1 (contrat v1 rév. 2).
 //
-// Données : /v1/meta (grille, niveaux, géoréférencement), /v1/latest (instantané courant),
-// /v1/fields/{id}/{niveau}/{var} (binaires, en cache par instantané / niveau / variable),
-// /v1/terrain et /v1/stations/{id} pour le profil au clic, CALCULÉ CÔTÉ CLIENT depuis les
-// champs (domain/profile.ts). Toute ressource absente s'affiche « indisponible » ; aucune
-// donnée de démo.
+// Données : /v1/meta (grille, niveaux, encodage, géoréférencement), /v1/latest (instantané courant),
+// /v1/snapshots/{id} (réseau, indicateurs), /v1/fields/{id}/{niveau}/{var} (un niveau, en cache par
+// instantané / niveau / variable). Profil au clic : /v1/column/{id}?i&j (UNE requête), direction et
+// intervalle à 80 % calculés par le front (domain/profile.ts). Toute ressource absente s'affiche
+// « indisponible » ou « non disponible » ; aucune donnée de démo.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, CacheChamps, libelleErreur, type Meta, type Station } from '../data';
-import { centreMaille, DENSITES, domaineDepuisMeta, echantillonner, mailleDe, statsPlan, strideCible, type Domaine } from '../domain/field';
-import { profilColonne, VARS_PROFIL, type ProfilCalcule, type VarProfil } from '../domain/profile';
+import { api, CacheChamps, libelleErreur, type Meta, type Snapshot, type Station } from '../data';
+import { DENSITES, domaineDepuisMeta, echantillonner, noeudProche, positionNoeud, statsPlan, strideCible, type Domaine } from '../domain/field';
+import { profilDepuisColonne, type ProfilCalcule } from '../domain/profile';
+import { capteurProche, type CapteurProche } from '../domain/capteurs';
+import { latLon } from '../domain/geo';
 import { cardinal } from '../domain/wind';
 import { Viz, viridisCss, type PickResult, type SceneMeta } from '../scene/viz';
 import { brancherScene, signalerEchec, signalerPremierRendu, type AtomPick } from '../scene/hook';
@@ -27,7 +29,7 @@ type Chargement<T> = { etat: 'attente' } | { etat: 'ok'; val: T } | { etat: 'err
 
 interface Attente { niveau: number; ok: () => void; ko: ( e: unknown ) => void }
 
-interface ProfilAffiche extends ProfilCalcule { station: { id: string; distance_m: number } | null }
+interface ProfilAffiche extends ProfilCalcule { capteur: CapteurProche | null; lat: number; lon: number }
 
 /** Indice du niveau le plus proche d'une altitude (m au-dessus de la mer). */
 function niveauProche( altitudes: number[], m: number ): number {
@@ -53,35 +55,14 @@ function stations( id: string ): Promise<Station[]> {
 
 }
 
-/** Charge les champs de tous les niveaux à la maille (i, j) et assemble le profil. */
-async function chargerProfil( id: string, dom: Domaine, i: number, j: number ): Promise<ProfilAffiche> {
+/** Profil de la colonne (i, j) : une seule requête /v1/column, calculs du contrat côté front. */
+async function chargerProfil( id: string, meta: Meta, dom: Domaine, reseau: Snapshot[ 'network' ][ 'kind' ] | null, i: number, j: number ): Promise<ProfilAffiche> {
 
-	const parNiveau = await Promise.all( dom.altitudes.map( async ( _, k ) => {
-
-		const entrees = await Promise.all( VARS_PROFIL.map( async ( v ) => {
-
-			// u, v, speed sont indispensables ; les autres variables peuvent manquer.
-			const indispensable = v === 'u' || v === 'v' || v === 'speed';
-			const p = champs.champ( id, k, v );
-			return [ v, indispensable ? await p : await p.catch( () => undefined ) ] as const;
-
-		} ) );
-		return Object.fromEntries( entrees ) as Partial<Record<VarProfil, Float32Array>>;
-
-	} ) );
-	const terrain = await champs.terrain().catch( () => null );
-	const profil = profilColonne( dom, i, j, parNiveau, terrain );
-	const st = await stations( id ).catch( () => [] as Station[] );
-	let station: ProfilAffiche[ 'station' ] = null;
-	for ( const s of st ) {
-
-		if ( s.state === 'exclue' || s.state === 'muette' ) continue;
-		const d = Math.hypot( s.x_m - profil.x_m, s.y_m - profil.y_m );
-		if ( ! station || d < station.distance_m ) station = { id: s.id, distance_m: d };
-
-	}
-
-	return { ...profil, station };
+	const colonne = await api.column( id, i, j );
+	const profil = profilDepuisColonne( colonne );
+	const st = reseau ? await stations( id ).catch( () => null ) : null;
+	const capteur = reseau && st ? capteurProche( reseau, st, profil.x_m, profil.y_m, dom ) : null;
+	return { ...profil, capteur, ...latLon( meta, profil.x_m, profil.y_m ) };
 
 }
 
@@ -100,15 +81,32 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	const [ relief, setRelief ] = useState( true );
 	const [ plan, setPlan ] = useState<Chargement<{ stats: ReturnType<typeof statsPlan>; range: [ number, number ]; stride: number }>>( { etat: 'attente' } );
 	const [ profil, setProfil ] = useState<{ cle: string; x_m: number; y_m: number; res: Chargement<ProfilAffiche> } | null>( null );
+	const [ snapshot, setSnapshot ] = useState<Chargement<Snapshot>>( { etat: 'attente' } );
 
 	const snapshotId = latest.etat === 'ok' ? latest.latest.snapshot_id : null;
 	const dom = meta.etat === 'ok' ? meta.val.dom : null;
+	const metaV = meta.etat === 'ok' ? meta.val.meta : null;
+	const encodage = metaV?.encoding;
+	const reseau = snapshot.etat === 'ok' ? snapshot.val.network.kind : null;
+
+	// Résumé de l'instantané (réseau, indicateurs) : facultatif pour la scène.
+	useEffect( () => {
+
+		if ( ! snapshotId ) return;
+		const ctl = new AbortController();
+		api.snapshot( snapshotId, ctl.signal ).then(
+			( val ) => setSnapshot( { etat: 'ok', val } ),
+			( e ) => { if ( e.name !== 'AbortError' ) setSnapshot( { etat: 'erreur', message: libelleErreur( e ) } ); },
+		);
+		return () => ctl.abort();
+
+	}, [ snapshotId ] );
 
 	// 1. /v1/meta (jamais de grille codée en dur).
 	useEffect( () => {
 
 		const ctl = new AbortController();
-		api.meta( ctl.signal ).then(
+		api.meta( undefined, ctl.signal ).then(
 			( m ) => {
 
 				const d = domaineDepuisMeta( m );
@@ -136,14 +134,14 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	const surPick = useRef<( p: PickResult ) => AtomPick | null>( () => null );
 	surPick.current = ( p ) => {
 
-		if ( ! dom ) return null;
-		const { i, j } = mailleDe( dom, p.fx * dom.sizeX, p.fy * dom.sizeY );
-		const { x_m, y_m } = centreMaille( dom, i, j );
+		if ( ! dom || ! metaV ) return null;
+		const { i, j } = noeudProche( dom, dom.x0 + p.fx * dom.sizeX, dom.y0 + p.fy * dom.sizeY );
+		const { x_m, y_m } = positionNoeud( dom, i, j );
 		if ( snapshotId ) {
 
 			const cle = `${ snapshotId }/${ i }/${ j }`;
 			setProfil( { cle, x_m, y_m, res: { etat: 'attente' } } );
-			chargerProfil( snapshotId, dom, i, j ).then(
+			chargerProfil( snapshotId, metaV, dom, reseau, i, j ).then(
 				( val ) => setProfil( ( cur ) => cur?.cle === cle ? { ...cur, res: { etat: 'ok', val } } : cur ),
 				( e ) => setProfil( ( cur ) => cur?.cle === cle ? { ...cur, res: { etat: 'erreur', message: libelleErreur( e ) } } : cur ),
 			);
@@ -189,9 +187,9 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 		let actif = true;
 		setPlan( ( p ) => ( p.etat === 'ok' ? p : { etat: 'attente' } ) );
 		Promise.all( [
-			champs.champ( snapshotId, niveau, 'u' ),
-			champs.champ( snapshotId, niveau, 'v' ),
-			champs.champ( snapshotId, niveau, 'w' ).catch( () => null ), // w facultatif pour l'affichage
+			champs.champ( snapshotId, niveau, 'u', encodage?.u?.scale ),
+			champs.champ( snapshotId, niveau, 'v', encodage?.v?.scale ),
+			champs.champ( snapshotId, niveau, 'w', encodage?.w?.scale ).catch( () => null ), // w facultatif pour l'affichage
 		] ).then( async ( [ u, v, w ] ) => {
 
 			if ( ! actif ) return;
@@ -216,7 +214,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 		} );
 		return () => { actif = false; };
 
-	}, [ dom, niveau, densite, vertical, snapshotId, reglerAttentes ] );
+	}, [ dom, encodage, niveau, densite, vertical, snapshotId, reglerAttentes ] );
 
 	useEffect( () => { vizRef.current?.setTerrainVisible( relief ); }, [ relief, sceneMeta ] );
 
@@ -256,7 +254,9 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	const altitudes = dom?.altitudes ?? [];
 	const altCourante = niveau != null ? altitudes[ niveau ] : null;
 	const degrade = useMemo( () => `linear-gradient(90deg, ${ Array.from( { length: 10 }, ( _, i ) => viridisCss( i / 9 ) ).join( ',' ) })`, [] );
-	const georef = meta.etat === 'ok' ? meta.val.meta.georef : null;
+	const georef = metaV?.georef ?? null;
+	const nd = 'non disponible';
+	const snap = snapshot.etat === 'ok' ? snapshot.val : null;
 
 	let messageScene: string | null = null;
 	if ( meta.etat === 'erreur' ) messageScene = `Grille ${ meta.message }`;
@@ -329,7 +329,13 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 							<dt>Grille</dt><dd>{ dom ? `${ dom.nx } × ${ dom.ny } × ${ dom.nz }` : '—' }</dd>
 							<dt>Domaine</dt><dd>{ dom ? `${ fmt( dom.sizeX / 1000, 1 ) } × ${ fmt( dom.sizeY / 1000, 1 ) } km` : '—' }</dd>
 							<dt>Position</dt>
-							<dd data-testid="georef">{ georef ? `${ fmt( georef.lat0, 2 ) }° N, ${ fmt( georef.lon0, 2 ) }° E${ georef.suppose ? ' (position supposée)' : '' }` : '—' }</dd>
+							<dd data-testid="georef">{ georef ? `${ fmt( georef.bounds.lat_min, 3 ) }–${ fmt( georef.bounds.lat_max, 3 ) }° N, ${ fmt( georef.bounds.lon_min, 3 ) }–${ fmt( georef.bounds.lon_max, 3 ) }° E${ georef.suppose ? ' (position supposée)' : '' }` : '—' }</dd>
+							<dt>Réseau</dt>
+							<dd data-testid="reseau">{ snap ? `${ snap.network.kind === 'treillis_synthetique' ? 'treillis synthétique' : 'stations ANEO' } · ${ fmt( snap.network.sensors_visible ) } / ${ fmt( snap.network.sensors_total ) } capteurs` : snapshot.etat === 'erreur' ? nd : '—' }</dd>
+							<dt>Vent au moyeu</dt>
+							<dd>{ snap?.kpi.hub_wind_mean_ms != null ? `${ fmt( snap.kpi.hub_wind_mean_ms, 1 ) } m/s moy. à ${ fmt( snap.kpi.hub_height_agl_m ) } m sol` : nd }</dd>
+							<dt>Physique</dt>
+							<dd>{ snap?.physics ? ( snap.physics.mass_residual_ok ? 'résidu de masse sous le seuil' : 'résidu de masse au-dessus du seuil' ) : nd }</dd>
 						</dl>
 					) : <p className="muet">{ latest.etat === 'erreur' ? latest.message : 'chargement…' }</p> }
 				</section>
@@ -367,7 +373,8 @@ function Profil( { profil }: { profil: { res: Chargement<ProfilAffiche> } | null
 			<ProfileChart niveaux={ p.levels } />
 			<p className="muet petit num">
 				Relief { fmt( p.z_terrain_m, 0 ) } m
-				{ p.station ? ` · station la plus proche : ${ p.station.id } (${ fmt( p.station.distance_m / 1000, 1 ) } km)` : '' }
+				{ ` · nœud (${ p.i }, ${ p.j }) · ${ fmt( p.lat, 4 ) }° N, ${ fmt( p.lon, 4 ) }° E` }
+				{ p.capteur ? ` · capteur le plus proche : ${ p.capteur.id } (${ fmt( p.capteur.distance_m, 0 ) } m${ p.capteur.state !== 'active' ? `, ${ p.capteur.state }` : '' })` : '' }
 				{ ' · intervalle à 80 %' }
 			</p>
 			<table className="tableau-profil num">
@@ -376,7 +383,7 @@ function Profil( { profil }: { profil: { res: Chargement<ProfilAffiche> } | null
 					{ [ ...p.levels ].reverse().map( ( l ) => (
 						<tr key={ l.z_asl_m } className={ l.below_terrain ? 'sous-relief' : undefined }>
 							<td>{ fmt( l.z_asl_m ) } m</td>
-							<td>{ fmt( l.agl_m ) } m</td>
+							<td>{ fmt( l.z_agl_m ) } m</td>
 							{ l.below_terrain ? <td colSpan={ 4 }>sous le relief</td> : (
 								<>
 									<td>{ fmt( l.speed, 1 ) }</td>

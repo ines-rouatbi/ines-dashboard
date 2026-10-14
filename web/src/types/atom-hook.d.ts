@@ -4,7 +4,7 @@
 
 import type { Viz } from '../scene/viz';
 
-/** Résultat de `pick` : maille cliquée et position. */
+/** Résultat de `pick` : nœud cliqué et position (contrat v1 rév. 2 : nœud (i, j) en x0 + i·dx). */
 export interface AtomPick {
 	/** Indices dans la grille AFFICHÉE (échantillonnée selon la densité). */
 	ix: number;
@@ -12,10 +12,10 @@ export interface AtomPick {
 	/** Fractions du domaine depuis le coin sud-ouest, dans [0, 1]. */
 	fx: number;
 	fy: number;
-	/** Maille NATIVE du contrat (index binaire = j * nx + i). */
+	/** Nœud NATIF le plus proche (index binaire = j·nx + i), celui de /v1/column/{id}?i&j. */
 	i: number;
 	j: number;
-	/** Centre de la maille native, en m depuis le coin sud-ouest. */
+	/** Position de ce nœud, en m : x = x0 + i·dx, y = y0 + j·dy. */
 	x_m: number;
 	y_m: number;
 }
@@ -41,7 +41,7 @@ export interface AtomHook {
 	 * Picking à (x, y), en PIXELS CSS RELATIFS AU COIN HAUT-GAUCHE DU CANEVAS de la scène
 	 * (comme `event.offsetX/offsetY`, sans tenir compte de devicePixelRatio). Résout, après
 	 * le rendu du marqueur, avec un `AtomPick`, ou `null` si le rayon ne touche pas le
-	 * domaine. Déclenche aussi le calcul du profil vertical affiché dans le panneau.
+	 * domaine. Déclenche aussi le profil vertical du nœud (/v1/column), affiché dans le panneau.
 	 */
 	pick( x: number, y: number ): Promise<AtomPick | null>;
 }
