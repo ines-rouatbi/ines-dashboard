@@ -10,6 +10,8 @@
     "moduleDetection": "force",
     "isolatedModules": true,
     "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
     "types": ["node"],
     "strict": true,
     "noUnusedLocals": true,
