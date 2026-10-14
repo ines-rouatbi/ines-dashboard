@@ -132,6 +132,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 
 	// 2. Profil vertical au clic (maille native, calcul côté client).
 	const surPick = useRef<( p: PickResult ) => AtomPick | null>( () => null );
+	const dernierPick = useRef<AtomPick | null>( null );
 	surPick.current = ( p ) => {
 
 		if ( ! dom || ! metaV ) return null;
@@ -148,7 +149,8 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 
 		}
 
-		return { ...p, i, j, x_m, y_m };
+		dernierPick.current = { ...p, i, j, x_m, y_m };
+		return dernierPick.current;
 
 	};
 
@@ -241,9 +243,11 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 
 				// (x, y) : pixels CSS relatifs au coin haut-gauche du canevas.
 				const r = viz.canvas.getBoundingClientRect();
+				// pickAt déclenche onPick (donc le chargement du profil, une seule fois).
+				dernierPick.current = null;
 				const p = viz.pickAt( r.left + x, r.top + y );
 				await viz.apresRendu();
-				return p ? surPick.current( { ...p } ) : null;
+				return p ? dernierPick.current : null;
 
 			},
 		} );
@@ -310,7 +314,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 					</div>
 				</div>
 
-				<p className="astuce">Clic sur la scène : profil vertical de la maille. La direction indique <b>d'où vient</b> le vent.</p>
+				<p className="astuce">Clic sur la scène : profil vertical du nœud le plus proche. La direction indique <b>d'où vient</b> le vent.</p>
 			</aside>
 
 			<div className="scene">

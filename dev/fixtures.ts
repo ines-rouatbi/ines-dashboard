@@ -43,7 +43,22 @@ export interface FauxR2 {
 	delete(): Promise<never>;
 }
 
-const lireJSON = ( f: string ) => JSON.parse( readFileSync( f, 'utf8' ) );
+// Cache des fichiers lus, invalidé par la date de modification : /v1/column fait ~130 lectures
+// partielles du même fichier, qu'on ne relit pas à chaque fois (régénérer les fixtures reste pris en compte).
+const cacheFichiers = new Map<string, { mtimeMs: number; octets: Uint8Array }>();
+function lireFichier( f: string ): Uint8Array | null {
+
+	if ( ! existsSync( f ) ) return null;
+	const st = statSync( f );
+	if ( ! st.isFile() ) return null;
+	const c = cacheFichiers.get( f );
+	if ( c && c.mtimeMs === st.mtimeMs ) return c.octets;
+	const octets = new Uint8Array( readFileSync( f ) );
+	cacheFichiers.set( f, { mtimeMs: st.mtimeMs, octets } );
+	return octets;
+
+}
+const lireJSON = ( f: string ) => { const o = lireFichier( f ); return o ? JSON.parse( new TextDecoder().decode( o ) ) : null; };
 
 function objet( key: string, octets: Uint8Array ): ObjetR2 {
 
@@ -66,7 +81,7 @@ export function resoudreCle( dossier: string, key: string, maintenant = () => ne
 	const parts = key.split( '/' );
 	if ( ! parts.every( sur ) ) return null;
 	const latestF = join( dossier, 'latest.json' );
-	const latest = existsSync( latestF ) ? lireJSON( latestF ) as { snapshot_id?: string; compute_status?: string; heartbeat_at?: string | null } : null;
+	const latest = lireJSON( latestF ) as { snapshot_id?: string; compute_status?: string; heartbeat_at?: string | null } | null;
 
 	if ( key === 'latest.json' ) return latest ? { fichier: latestF } : null;
 	if ( key === 'heartbeat.json' ) {
@@ -78,8 +93,8 @@ export function resoudreCle( dossier: string, key: string, maintenant = () => ne
 	}
 	if ( key === 'index/times.json' ) {
 
-		const f = join( dossier, 'times.json' );
-		return existsSync( f ) ? { contenu: JSON.stringify( lireJSON( f ).items ?? [] ) } : null;
+		const t = lireJSON( join( dossier, 'times.json' ) );
+		return t ? { contenu: JSON.stringify( t.items ?? [] ) } : null;
 
 	}
 	if ( parts[ 0 ] === 'models' && parts.length >= 3 ) {
@@ -110,8 +125,8 @@ export function fauxR2( dossier: string ): FauxR2 {
 		if ( ! r ) return null;
 		if ( 'contenu' in r ) return new TextEncoder().encode( r.contenu );
 		const f = resolve( r.fichier );
-		if ( ! f.startsWith( racine + sep ) || ! existsSync( f ) || ! statSync( f ).isFile() ) return null;
-		return new Uint8Array( readFileSync( f ) );
+		if ( ! f.startsWith( racine + sep ) ) return null;
+		return lireFichier( f );
 
 	};
 	const lectureSeule = async (): Promise<never> => { throw new Error( 'faux R2 en lecture seule (fixtures)' ); };
