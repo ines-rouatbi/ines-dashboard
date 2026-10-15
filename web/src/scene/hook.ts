@@ -4,10 +4,10 @@
 // (`signalerPremierRendu`) ou un échec de chargement (`signalerEchec`). `ready` est rejetée
 // au bout de DELAI_READY_MS si aucune scène n'a été rendue.
 
-import type { AtomHook, AtomPick } from '../types/atom-hook';
+import type { AtomEtat, AtomHook, AtomPick, AtomReglages } from '../types/atom-hook';
 import type { Viz } from './viz';
 
-export type { AtomHook, AtomPick };
+export type { AtomEtat, AtomHook, AtomPick, AtomReglages };
 
 export const DELAI_READY_MS = 15_000;
 
@@ -15,6 +15,9 @@ export const DELAI_READY_MS = 15_000;
 export interface ControleurScene {
 	viz: Viz;
 	setAltitude( m: number ): Promise<void>;
+	setHauteurSol( m: number ): Promise<void>;
+	regler( r: Partial<AtomReglages> ): Promise<void>;
+	etat(): AtomEtat;
 	pick( x: number, y: number ): Promise<AtomPick | null>;
 }
 
@@ -56,6 +59,10 @@ export function installerCrochet( delaiMs = DELAI_READY_MS ): AtomHook {
 		ready,
 		get scene() { return courant?.viz ?? null; },
 		setAltitude: async ( m ) => controleur().setAltitude( m ),
+		setHauteurSol: async ( m ) => controleur().setHauteurSol( m ),
+		orbit: async ( deg ) => controleur().viz.orbit( deg ),
+		regler: async ( r ) => controleur().regler( r ),
+		etat: () => controleur().etat(),
 		pick: async ( x, y ) => controleur().pick( x, y ),
 	};
 	if ( typeof window !== 'undefined' ) window.__atom = hook;

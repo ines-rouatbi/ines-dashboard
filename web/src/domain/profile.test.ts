@@ -27,7 +27,7 @@ describe( 'profil calculé par le front depuis /v1/column', () => {
 		expect( l.speed_interval.p50 ).toBe( 5 );
 		expect( l.speed_interval.p10! ).toBeCloseTo( 5 - Z80 * 0.5, 9 );
 		expect( l.speed_interval.p90! ).toBeCloseTo( 5 + Z80 * 0.5, 9 );
-		expect( l.reliability_class ).toBeNull();
+		expect( l.reliability_class ).toBe( 'moyenne' );
 
 	} );
 
