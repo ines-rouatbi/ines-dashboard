@@ -12,6 +12,16 @@ npm test                             # fonctionnels headless (porte / CI)
 npm run perf                         # banc de perf : Chrome avec fenêtre et GPU matériel
 ```
 
+## Serveur testé
+
+Prérequis : `npm ci` à la **racine** du dépôt (Vite, et le code du Worker `src/v1.js`).
+
+| `ATOM_SERVER` | Serveur lancé par Playwright (si `ATOM_URL` est absent) | Données |
+|---|---|---|
+| `vite` (défaut) | `npx --no-install vite` de la racine, au port `ATOM_PORT` | `/v1` servi depuis `contract/fixtures/` par le **vrai** `src/v1.js` sur un faux R2 (`dev/fixtures.ts`). `?scenario=normal|capteur_en_derive|gpu_eteint` choisit l'instantané (cookie de dev `atom_fixture`, sinon `ATOM_FIXTURE`, sinon `normal`). Pas de build, pas de R2. Pas de proxy `/api` : le test « `/api` en 503 » est sauté. `ATOM_F4_ROUTE` vaut d'office `<ATOM_URL>/{page}?scenario={scenario}` : les tests des pages Éolien et Alertes tournent. |
+| `wrangler` | `npx --no-install wrangler dev` épinglé de `e2e/` sur la config de la racine | Worker complet (`/api` compris). Il faut d'abord `npm run build` à la racine, un `PUBLISH_TOKEN` local dans `.dev.vars` (jamais commité), puis publier un instantané de test dans le R2 **local** : `ATOM_PUBLISH_TOKEN=<jeton local> node contract/tools/publish.mjs contract/fixtures/normal http://127.0.0.1:8787`. Une fois les correctifs F1 fusionnés, lancer wrangler avec `--var ATOM_ALLOW_TEST_SNAPSHOTS:1`, sans quoi les données de test sont refusées. |
+| (aucun) | — | `ATOM_URL` fourni : serveur externe, rien n'est lancé. |
+
 **Prérequis du banc de perf** : Google Chrome installé (projet `headed-gpu`, `channel: 'chrome'`).
 Le drapeau `--use-angle` vaut `d3d11` sous Windows, `metal` sous macOS, `gl` ailleurs ; `ATOM_ANGLE` le force.
 
@@ -30,8 +40,10 @@ Le drapeau `--use-angle` vaut `d3d11` sous Windows, `metal` sous macOS, `gl` ail
 
 | Variable | Défaut | Effet |
 |---|---|---|
-| `ATOM_URL` | `http://127.0.0.1:<ATOM_PORT>` | Adresse testée. Si absente, Playwright lance le `wrangler dev` épinglé sur la config de la racine (ou réutilise le serveur du port). |
-| `ATOM_PORT` | `8787` | Port du `wrangler dev` lancé par Playwright. |
+| `ATOM_URL` | `http://127.0.0.1:<ATOM_PORT>` | Adresse testée. Si absente, Playwright lance le serveur choisi par `ATOM_SERVER` (ou réutilise celui du port). |
+| `ATOM_PORT` | `8787` | Port du serveur lancé par Playwright (Vite ou `wrangler dev`). |
+| `ATOM_SERVER` | `vite` | `vite` (fixtures du contrat) ou `wrangler` (Worker local) ; voir « Serveur testé ». |
+| `ATOM_F4_ROUTE` | `<ATOM_URL>/{page}?scenario={scenario}` avec Vite | Gabarit d'URL des pages Éolien et Alertes ; sans lui, leurs tests navigateur sont sautés. |
 | `ATOM_REQUIRE_API` | — | `1` (CI, et dès F0) : l'absence de `window.__atom`, ou un `ready` rejeté, fait **échouer** le banc au lieu de le sauter ou de mesurer la visionneuse historique. |
 | `ATOM_MACHINE` | `non renseigné` | Libellé du poste écrit dans le rapport (pas de nom d'hôte automatique : les références sont commitées). |
 | `ATOM_ANGLE` | selon l'OS | Moteur ANGLE de Chrome (`d3d11`, `metal`, `vulkan`, `gl`). |

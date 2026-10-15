@@ -3,7 +3,7 @@
 // une grandeur que l'API ne publie pas n'apparaît pas, une grandeur publiée à null s'affiche « non disponible ».
 import { useState } from 'react';
 import type { EolienData } from '../shared/api';
-import type { Turbine, WindRose } from '../shared/types';
+import type { Turbine, WindFarm, WindRose } from '../shared/types';
 import { WINDROSE_MIN_VALID } from '../shared/types';
 import { AIR_DENSITY_SOURCE, NA, TURBINE_STATE, interval, num, utc, veer, withUnit } from '../shared/format';
 import { PowerCurveChart, WindRoseChart } from './charts';
@@ -80,7 +80,7 @@ function RoseCard( { rose }: { rose: WindRose } ) {
 
 export function EolienPage( { data }: { data: EolienData } ) {
 
-	const { windFarm: wf, windroses } = data;
+	const { windFarm, windroses } = data;
 	const [ selected, setSelected ] = useState( windroses[ 0 ]?.point.id ?? null );
 	const current = windroses.find( ( r ) => r.point.id === selected ) ?? null;
 
@@ -88,6 +88,38 @@ export function EolienPage( { data }: { data: EolienData } ) {
 		<section className="atom-page" data-testid="page-eolien">
 			<h2>Éolien</h2>
 
+			{ windFarm
+				? <Parc wf={ windFarm } />
+				: <p className="atom-muted" data-testid="no-wind-farm">Parc éolien : { NA } (wind-farm non publié pour cet instantané).</p> }
+
+			<h3>Rose des vents et Weibull</h3>
+			{ windroses.length === 0
+				? <p className="atom-muted" data-testid="no-windrose">Aucune rose des vents publiée pour cet instantané.</p>
+				: (
+					<>
+						<div className="atom-tabs" role="tablist">
+							{ windroses.map( ( { point } ) => (
+								<button key={ point.id } type="button" role="tab" aria-selected={ point.id === selected }
+									data-testid="windrose-tab" data-site-id={ point.id } onClick={ () => setSelected( point.id ) }>
+									{ point.name } <span className="atom-muted">{ point.kind === 'site' ? 'site candidat' : 'éolienne' }</span>
+								</button>
+							) ) }
+						</div>
+						{ current && ( current.rose
+							? <RoseCard key={ current.point.id } rose={ current.rose } />
+							: <p className="atom-muted" data-testid="windrose-missing">Rose des vents de { current.point.name } : { NA }.</p> ) }
+					</>
+				) }
+		</section>
+	);
+
+}
+
+/** Parc, éoliennes et courbes de puissance (wind-farm.json publié). */
+function Parc( { wf }: { wf: WindFarm } ) {
+
+	return (
+		<>
 			<div className="atom-kpis">
 				<div className="atom-kpi" data-testid="farm-power">
 					<span className="atom-kpi-value">{ interval( wf.farm.power_kw, 'kW' ) }</span>
@@ -122,26 +154,7 @@ export function EolienPage( { data }: { data: EolienData } ) {
 
 			<h3>Courbes de puissance</h3>
 			<div className="atom-card"><PowerCurveChart farm={ wf } /></div>
-
-			<h3>Rose des vents et Weibull</h3>
-			{ windroses.length === 0
-				? <p className="atom-muted" data-testid="no-windrose">Aucune rose des vents publiée pour cet instantané.</p>
-				: (
-					<>
-						<div className="atom-tabs" role="tablist">
-							{ windroses.map( ( { point } ) => (
-								<button key={ point.id } type="button" role="tab" aria-selected={ point.id === selected }
-									data-testid="windrose-tab" data-site-id={ point.id } onClick={ () => setSelected( point.id ) }>
-									{ point.name } <span className="atom-muted">{ point.kind === 'site' ? 'site candidat' : 'éolienne' }</span>
-								</button>
-							) ) }
-						</div>
-						{ current && ( current.rose
-							? <RoseCard key={ current.point.id } rose={ current.rose } />
-							: <p className="atom-muted" data-testid="windrose-missing">Rose des vents de { current.point.name } : { NA }.</p> ) }
-					</>
-				) }
-		</section>
+		</>
 	);
 
 }

@@ -37,6 +37,7 @@ test( 'la scène 3D a un contexte WebGL', async ( { page } ) => {
 test( 'GPU éteint : /api répond 503 service_asleep en JSON, jamais une page d’erreur HTML', async ( { request } ) => {
 
 	test.skip( !! process.env.ATOM_GPU_ON, 'ATOM_GPU_ON défini : le service tourne' );
+	test.skip( process.env.ATOM_SERVER === 'vite', 'serveur Vite des fixtures : pas de proxy /api (ATOM_SERVER=wrangler pour ce test)' );
 	const res = await request.get( '/api/meta' );
 	expect( res.status() ).toBe( 503 );
 	expect( res.headers()[ 'content-type' ] ).toMatch( /json/ );

@@ -13,10 +13,10 @@ export function PowerCurveChart( { farm }: { farm: WindFarm } ) {
 
 	const option = useMemo<EChartsOption>( () => {
 
-		const curves = Object.entries( farm.power_curves ).map( ( [ model, c ] ) => ( {
+		const curves = Object.entries( farm.power_curves ).flatMap( ( [ model, c ] ) => ( c ? [ {
 			name: `Courbe ${ model }`, type: 'line' as const, showSymbol: false,
 			data: c.speed_ms.map( ( v, k ) => [ v, c.power_kw[ k ] ] ),
-		} ) );
+		} ] : [] ) );
 		const placed = farm.turbines.filter( ( t: Turbine ) => t.rews.p50 != null && t.power_kw.p50 != null );
 		return {
 			animation: false,

@@ -2,13 +2,13 @@
 //
 // Racine du front : web/ ; build vers dist/ (servi par le Worker, cf. wrangler.jsonc).
 // En dev (et en preview), GET /v1/* est servi depuis contract/fixtures/<ATOM_FIXTURE>/
-// pour travailler sans GPU ni Worker.
+// pour travailler sans GPU ni Worker. ?scenario=<nom> change de scénario à l'exécution (cookie de dev).
 
 import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { middlewareFixtures } from './dev/fixtures';
+import { middlewareFixturesParScenario } from './dev/fixtures';
 
 const ici = fileURLToPath( new URL( '.', import.meta.url ) );
 const scenario = process.env.ATOM_FIXTURE || 'normal';
@@ -16,13 +16,13 @@ const scenario = process.env.ATOM_FIXTURE || 'normal';
 function fixturesV1(): Plugin {
 
 	const racine = resolve( ici, 'contract/fixtures' );
-	const mw = () => middlewareFixtures( racine, scenario );
+	const mw = () => middlewareFixturesParScenario( racine, scenario );
 	return {
 		name: 'atom-fixtures-v1',
 		configureServer( server ) {
 
 			server.middlewares.use( mw() );
-			server.config.logger.info( `  [atom] /v1/* servi depuis contract/fixtures/${ scenario }/` );
+			server.config.logger.info( `  [atom] /v1/* servi depuis contract/fixtures/${ scenario }/ (autre scénario : ?scenario=<nom>)` );
 
 		},
 		configurePreviewServer( server ) { server.middlewares.use( mw() ); },
@@ -44,7 +44,7 @@ export default defineConfig( {
 	},
 	test: {
 		root: ici,
-		include: [ 'web/src/**/*.test.ts', 'dev/**/*.test.ts' ],
+		include: [ 'web/src/**/*.test.{ts,tsx}', 'dev/**/*.test.ts' ],
 		environment: 'node',
 	},
 } );
