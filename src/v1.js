@@ -13,9 +13,13 @@
 //   - un commit rejoué (_commit.json déjà présent, par ex. après une panne entre _commit.json et latest)
 //     refait, de façon idempotente, l'écriture de l'index puis de latest à partir du _commit.json stocké ;
 //   - une simulation (snapshot.json : scenario non null, BF45 et BF46) est publiée et lisible par son
-//     identifiant, mais n'entre ni dans latest ni dans index/times.json (frise des reconstructions) ;
+//     identifiant, mais n'entre ni dans latest ni dans l'index /v1/times (frise des reconstructions) ;
 //   - un instantané de test (versions.data_kind = "test", D15) est refusé, sauf si la variable de dev
 //     ATOM_ALLOW_TEST_SNAPSHOTS vaut "1" (wrangler dev --var ATOM_ALLOW_TEST_SNAPSHOTS:1). Jamais en production.
+// Commits concurrents : l'index n'a plus de fichier partagé (une clé par instantané), et latest est écrit
+// sous condition d'etag (5 essais) : il ne recule jamais. Seule exception : tant qu'AUCUN latest n'existe,
+// la toute première écriture n'a pas d'etag à comparer ; le publieur sérialise donc au moins sa
+// première publication (en pratique, il publie un instantané à la fois).
 //
 // Disposition R2 :
 //   models/<sha8>/<path>           fichiers par modèle (meta.json, terrain.f32)
@@ -23,7 +27,8 @@
 //   snapshots/<id>/<path>          fichiers de l'instantané (snapshot.json, fields/<var>.f32|u8, profiles/, windrose/, ...)
 //   snapshots/<id>/_commit.json    manifeste vérifié + published_at (présent = instantané immuable)
 //   latest.json                    pointeur vers le dernier instantané commité
-//   index/times.json               liste des instantanés commités (du plus récent au plus ancien)
+//   index/times/<valid_time>~<id>  une entrée vide par instantané commité (hors simulations), données en
+//                                  customMetadata ; /v1/times les liste (R2 list), du plus récent au plus ancien
 //   heartbeat.json                 dernier battement de cœur du service GPU
 
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -245,7 +250,7 @@ async function handleRead( request, env, parts, url ) {
 
 	if ( resource === 'times' ) {
 
-		const all = ( await readJSON( b, 'index/times.json' ) ) ?? [];
+		const all = await lireIndex( b );
 		const from = url.searchParams.get( 'from' ), to = url.searchParams.get( 'to' );
 		const items = all.filter( ( t ) => ( ! from || t.valid_time >= from ) && ( ! to || t.valid_time <= to ) );
 		const start = Number( url.searchParams.get( 'cursor' ) ?? 0 ) || 0, page = 200;
@@ -427,24 +432,63 @@ async function finaliser( b, c ) {
 
 	const id = c.snapshot_id;
 	if ( c.simulation ) return { latest: false, index: false };
-	const alerts = await readJSON( b, `snapshots/${ id }/alerts.json` );
-	const openAlerts = Array.isArray( alerts?.items ) ? alerts.items.filter( ( x ) => x.status === 'ouverte' ).length : null;
-	const times = ( ( await readJSON( b, 'index/times.json' ) ) ?? [] ).filter( ( t ) => t.snapshot_id !== id );
-	times.push( { snapshot_id: id, valid_time: c.valid_time, open_alerts: openAlerts } );
-	times.sort( ( p, q ) => ( p.valid_time < q.valid_time ? 1 : p.valid_time > q.valid_time ? - 1 : 0 ) );
-	await putJSON( b, 'index/times.json', times );
-	const current = await readJSON( b, 'latest.json' );
-	const bascule = ! current || current.valid_time < c.valid_time
-		|| ( current.valid_time === c.valid_time && ( current.snapshot_id === id || ( current.published_at ?? '' ) <= c.published_at ) );
-	if ( bascule ) {
 
-		await putJSON( b, 'latest.json', {
-			snapshot_id: id, valid_time: c.valid_time, generated_at: c.generated_at ?? c.published_at, published_at: c.published_at,
-			last_observation_at: c.last_observation_at ?? null, data_status: c.data_status, versions: c.versions, href: `/v1/snapshots/${ id }`,
+	// Index : UNE entrée par instantané (aucune lecture-modification-écriture partagée, donc aucune perte
+	// d'entrée entre deux commits concurrents). open_alerts = somme de snapshot.kpi.open_alerts, null si
+	// le bloc est null (lot M4 inactif, B5 : jamais 0 pour l'inconnu).
+	const snap = await readJSON( b, `snapshots/${ id }/snapshot.json` );
+	const oa = snap?.kpi?.open_alerts;
+	const openAlerts = oa && typeof oa === 'object' ? Object.values( oa ).reduce( ( s, n ) => s + ( Number.isInteger( n ) ? n : 0 ), 0 ) : null;
+	await b.put( cleIndex( c.valid_time, id ), '', { customMetadata: {
+		snapshot_id: id, valid_time: c.valid_time, open_alerts: openAlerts === null ? '' : String( openAlerts ),
+	} } );
+
+	// latest : écriture conditionnelle (etag) pour qu'un commit concurrent plus ancien ne le fasse jamais reculer.
+	const doc = {
+		snapshot_id: id, valid_time: c.valid_time, generated_at: c.generated_at ?? c.published_at, published_at: c.published_at,
+		last_observation_at: c.last_observation_at ?? null, data_status: c.data_status, versions: c.versions, href: `/v1/snapshots/${ id }`,
+	};
+	for ( let essai = 0; essai < 5; essai ++ ) {
+
+		const o = await b.get( 'latest.json' );
+		const current = o ? await o.json() : null;
+		const bascule = ! current || current.valid_time < c.valid_time
+			|| ( current.valid_time === c.valid_time && ( current.snapshot_id === id || ( current.published_at ?? '' ) <= c.published_at ) );
+		if ( ! bascule ) return { latest: false, index: true };
+		// Premier latest du bucket : pas d'etag à comparer (voir la note sur la sérialisation, en tête).
+		const r = await b.put( 'latest.json', JSON.stringify( doc ), {
+			httpMetadata: { contentType: 'application/json' }, ...( o ? { onlyIf: { etagMatches: o.etag } } : {} ),
 		} );
+		if ( r !== null ) return { latest: true, index: true };
 
 	}
-	return { latest: bascule, index: true };
+	throw new Error( 'latest.json : conflit d’écriture persistant (5 essais)' );
+
+}
+
+// Index des instantanés : index/times/<valid_time>~<snapshot_id>, corps vide, données en customMetadata.
+// L'ordre lexicographique des clés R2 est l'ordre chronologique (valid_time ISO 8601 UTC).
+const INDEX_PREFIX = 'index/times/';
+const cleIndex = ( validTime, id ) => `${ INDEX_PREFIX }${ validTime }~${ id }`;
+
+async function lireIndex( b ) {
+
+	const items = [];
+	let cursor;
+	do {
+
+		const page = await b.list( { prefix: INDEX_PREFIX, cursor, limit: 1000, include: [ 'customMetadata' ] } );
+		for ( const o of page.objects ) {
+
+			const m = o.customMetadata ?? {};
+			if ( ! m.snapshot_id || ! m.valid_time ) continue;
+			items.push( { snapshot_id: m.snapshot_id, valid_time: m.valid_time, open_alerts: m.open_alerts === '' || m.open_alerts === undefined ? null : Number( m.open_alerts ) } );
+
+		}
+		cursor = page.truncated ? page.cursor : undefined;
+
+	} while ( cursor );
+	return items.reverse(); // du plus récent au plus ancien
 
 }
 

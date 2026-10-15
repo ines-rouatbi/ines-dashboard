@@ -52,7 +52,8 @@ Le validateur contrôle : schémas ; tailles des binaires ; NaN (ou 255) ⇔ `z 
    - `Content-Length` est obligatoire sur chaque `PUT` (411 sinon) ;
    - un commit **rejoué** refait, sans effet de bord, l'index et `latest` (reprise après une panne entre la vérification et la bascule) ; il est donc sûr de rejouer un commit dont la réponse a été perdue ;
    - une **simulation** (`snapshot.scenario` non null) est publiée et lisible par son identifiant, mais n'entre ni dans `latest` ni dans `index/times.json` ;
-   - un instantané `data_kind = "test"` est refusé (422 `instantane_de_test`), sauf en dev avec `ATOM_ALLOW_TEST_SNAPSHOTS=1`.
+   - un instantané `data_kind = "test"` est refusé (422 `instantane_de_test`), sauf en dev avec `ATOM_ALLOW_TEST_SNAPSHOTS=1` ;
+   - `/v1/times` : `open_alerts` = somme de `snapshot.kpi.open_alerts`, `null` si ce bloc est `null` (M4 inactif) ; l'index a une entrée par instantané, et `latest` est écrit sous condition d'etag : des commits concurrents ne perdent aucune entrée et `latest` ne recule jamais, sauf pour la toute première publication du bucket (sans `latest` existant), à faire seule.
 4. `POST /v1/heartbeat` toutes les 60 s tant que le service tourne. Sans battement depuis plus de 5 min, `compute_status` passe à `offline` et le tableau de bord affiche « dernier état réel calculé le … ».
 
 - **Identifiant** : `snapshot_id = <stem>[_<scénario>]_<sha8>`, où sha8 = 8 premiers caractères de `versions.model_sha256` (sha256 des octets du fichier de poids servi). Stem `live_AAAAMMJJ_HHMMSS` pour le direct ; `<scénario>` seulement pour une simulation (BF45, BF46). `versions.norm` = sha8 de `norm_stats.json`.

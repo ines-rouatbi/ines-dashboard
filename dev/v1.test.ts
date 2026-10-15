@@ -19,12 +19,16 @@ const sha256 = ( b: Uint8Array | string ) => createHash( 'sha256' ).update( b ).
 
 // --- Faux binding R2 -------------------------------------------------------------------------
 
-interface Stocke { octets: Uint8Array; customMetadata: Record<string, string> }
+interface Stocke { octets: Uint8Array; customMetadata: Record<string, string>; etag: string }
 
 class FauxR2 {
 
 	readonly objets = new Map<string, Stocke>();
-	appels = { get: 0, head: 0, put: 0 };
+	appels = { get: 0, head: 0, put: 0, list: 0 };
+	private version = 0;
+	/** Mises en attente aléatoires (0 à 2 tâches) : entrelace vraiment les commits concurrents. */
+	entrelacer = false;
+	private async pause() { if ( this.entrelacer ) for ( let k = Math.floor( Math.random() * 3 ); k > 0; k -- ) await new Promise( ( ok ) => setTimeout( ok, 0 ) ); }
 	octetsLus = 0;
 	/** Clé dont l'écriture échoue (panne simulée), ou null. */
 	panne: ( ( key: string ) => boolean ) | null = null;
@@ -35,7 +39,7 @@ class FauxR2 {
 
 		const morceau = this.morceau;
 		return {
-			key, size: s.octets.byteLength, customMetadata: s.customMetadata, httpEtag: `"${ s.octets.byteLength }"`,
+			key, size: s.octets.byteLength, customMetadata: s.customMetadata, etag: s.etag, httpEtag: `"${ s.etag }"`,
 			get body() {
 
 				let p = 0;
@@ -53,6 +57,7 @@ class FauxR2 {
 	async head( key: string ) {
 
 		this.appels.head ++;
+		await this.pause();
 		const s = this.objets.get( key );
 		return s ? this.objet( key, s, new Uint8Array() ) : null;
 
@@ -61,6 +66,7 @@ class FauxR2 {
 	async get( key: string, opts?: { range?: { offset: number; length: number } } ) {
 
 		this.appels.get ++;
+		await this.pause();
 		const s = this.objets.get( key );
 		if ( ! s ) return null;
 		const octets = opts?.range ? s.octets.slice( opts.range.offset, opts.range.offset + opts.range.length ) : s.octets;
@@ -69,18 +75,35 @@ class FauxR2 {
 
 	}
 
-	async put( key: string, v: string | ArrayBuffer | Uint8Array, o?: { customMetadata?: Record<string, string> } ) {
+	async put( key: string, v: string | ArrayBuffer | Uint8Array, o?: { customMetadata?: Record<string, string>; onlyIf?: { etagMatches?: string } } ) {
 
 		this.appels.put ++;
+		await this.pause();
 		if ( this.panne?.( key ) ) throw new Error( `R2 indisponible (simulé) : ${ key }` );
+		// Écriture conditionnelle (R2 : onlyIf) : null si l'etag ne correspond plus.
+		if ( o?.onlyIf?.etagMatches !== undefined && this.objets.get( key )?.etag !== o.onlyIf.etagMatches ) return null;
 		const octets = typeof v === 'string' ? new TextEncoder().encode( v ) : v instanceof Uint8Array ? v.slice() : new Uint8Array( v.slice( 0 ) );
-		this.objets.set( key, { octets, customMetadata: o?.customMetadata ?? {} } );
+		const s = { octets, customMetadata: o?.customMetadata ?? {}, etag: `e${ ++ this.version }` };
+		this.objets.set( key, s );
+		return this.objet( key, s, octets );
+
+	}
+
+	async list( o: { prefix?: string; cursor?: string; limit?: number } = {} ) {
+
+		this.appels.list ++;
+		await this.pause();
+		// Pages de 2 objets : exerce la pagination (cursor) du Worker.
+		const cles = [ ...this.objets.keys() ].filter( ( k ) => k.startsWith( o.prefix ?? '' ) ).sort();
+		const debut = Number( o.cursor ?? 0 ), fin = Math.min( cles.length, debut + Math.min( 2, o.limit ?? 1000 ) );
+		const objects = cles.slice( debut, fin ).map( ( k ) => ( { key: k, customMetadata: this.objets.get( k )!.customMetadata } ) );
+		return fin < cles.length ? { objects, truncated: true, cursor: String( fin ) } : { objects, truncated: false };
 
 	}
 
 	lireJSON( key: string ) { const s = this.objets.get( key ); return s ? JSON.parse( new TextDecoder().decode( s.octets ) ) : null; }
 
-	remettreCompteurs() { this.appels = { get: 0, head: 0, put: 0 }; this.octetsLus = 0; }
+	remettreCompteurs() { this.appels = { get: 0, head: 0, put: 0, list: 0 }; this.octetsLus = 0; }
 
 }
 
@@ -120,14 +143,24 @@ function charger( sc: string ): Scenario {
 /** Variante simulation d'un scénario : snapshot.json avec scenario ≠ null, nouvel identifiant, manifeste recalculé. */
 function simulation( base: Scenario ): Scenario {
 
-	const id = base.manifeste.snapshot_id.replace( /_([0-9a-f]{8})$/, '_panne_zone_$1' );
+	return variante( base, base.manifeste.snapshot_id.replace( /_([0-9a-f]{8})$/, '_panne_zone_$1' ), ( snap ) => {
+
+		snap.scenario = { kind: 'panne_zone', zone: { x_min_m: 0, x_max_m: 10000, y_min_m: 0, y_max_m: 10000 }, baseline_snapshot_id: base.manifeste.snapshot_id };
+
+	} );
+
+}
+
+/** Variante d'un scénario : nouvel identifiant, snapshot.json modifié, manifeste recalculé (valid_time compris). */
+function variante( base: Scenario, id: string, modifier: ( snap: Record<string, any> ) => void = () => {} ): Scenario {
+
 	const snap = JSON.parse( new TextDecoder().decode( base.fichiers.get( 'snapshot.json' )! ) );
 	snap.snapshot_id = id;
-	snap.scenario = { kind: 'panne_zone', zone: { x_min_m: 0, x_max_m: 10000, y_min_m: 0, y_max_m: 10000 }, baseline_snapshot_id: base.manifeste.snapshot_id };
+	modifier( snap );
 	const octets = new TextEncoder().encode( JSON.stringify( snap ) );
 	const fichiers = new Map( base.fichiers ); fichiers.set( 'snapshot.json', octets );
 	const files = base.manifeste.files.map( ( f ) => f.path === 'snapshot.json' ? { path: f.path, bytes: octets.byteLength, sha256: sha256( octets ) } : f );
-	return { ...base, manifeste: { ...base.manifeste, snapshot_id: id, files }, fichiers };
+	return { ...base, manifeste: { ...base.manifeste, snapshot_id: id, valid_time: snap.valid_time, files }, fichiers };
 
 }
 
@@ -150,6 +183,15 @@ async function deposer( env: Env, s: Scenario ) {
 
 }
 
+/** Index lu par l'API, comme le client Python : GET /v1/times[?from&to]. */
+async function times( env: Env, q = '' ): Promise<{ snapshot_id: string; valid_time: string; open_alerts: number | null }[]> {
+
+	const r = await appel( env, 'GET', `/v1/times${ q }` );
+	expect( r.status ).toBe( 200 );
+	return r.corps.items;
+
+}
+
 const commit = ( env: Env, s: Scenario ) => appel( env, 'POST', `/v1/publish/${ s.manifeste.snapshot_id }/commit`, JSON.stringify( s.manifeste ) );
 
 // --- Tests -----------------------------------------------------------------------------------
@@ -168,7 +210,7 @@ describe.skipIf( ! existsSync( racine ) )( 'Worker /v1 (src/v1.js) sur faux R2',
 		expect( r.status ).toBe( 200 );
 		expect( r.corps ).toMatchObject( { ok: true, latest: true, simulation: false } );
 		expect( env.SNAPSHOTS.lireJSON( 'latest.json' ).snapshot_id ).toBe( s.manifeste.snapshot_id );
-		expect( env.SNAPSHOTS.lireJSON( 'index/times.json' ).map( ( t: { snapshot_id: string } ) => t.snapshot_id ) ).toEqual( [ s.manifeste.snapshot_id ] );
+		expect( ( await times( env ) ).map( ( t ) => t.snapshot_id ) ).toEqual( [ s.manifeste.snapshot_id ] );
 
 	} );
 
@@ -176,7 +218,7 @@ describe.skipIf( ! existsSync( racine ) )( 'Worker /v1 (src/v1.js) sur faux R2',
 
 		const s = charger( 'normal' );
 		await deposer( env, s );
-		env.SNAPSHOTS.panne = ( k ) => k === 'index/times.json';
+		env.SNAPSHOTS.panne = ( k ) => k.startsWith( 'index/times/' );
 		vi.spyOn( console, 'error' ).mockImplementation( () => {} );
 		const r1 = await commit( env, s );
 		expect( r1.status ).toBe( 500 );
@@ -188,19 +230,55 @@ describe.skipIf( ! existsSync( racine ) )( 'Worker /v1 (src/v1.js) sur faux R2',
 		expect( r2.status ).toBe( 200 );
 		expect( r2.corps ).toMatchObject( { ok: true, unchanged: true, latest: true } );
 		const latest = env.SNAPSHOTS.lireJSON( 'latest.json' );
-		const index = env.SNAPSHOTS.lireJSON( 'index/times.json' );
+		const vt = encodeURIComponent( s.manifeste.valid_time as string );
+		const index = await times( env, `?from=${ vt }&to=${ vt }` );
 		expect( latest.snapshot_id ).toBe( s.manifeste.snapshot_id );
 		expect( latest.published_at ).toBe( env.SNAPSHOTS.lireJSON( `snapshots/${ s.manifeste.snapshot_id }/_commit.json` ).published_at );
-		expect( index ).toEqual( [ { snapshot_id: s.manifeste.snapshot_id, valid_time: s.manifeste.valid_time, open_alerts: 1 } ] ); // normal : 1 ouverte, 1 close
+		expect( index ).toEqual( [ { snapshot_id: s.manifeste.snapshot_id, valid_time: s.manifeste.valid_time, open_alerts: 1 } ] ); // somme de snapshot.kpi.open_alerts (normal : 1)
 
 		// Un troisième commit ne change rien (octets identiques).
-		const avant = [ 'latest.json', 'index/times.json' ].map( ( k ) => sha256( env.SNAPSHOTS.objets.get( k )!.octets ) );
+		const cles = () => [ ...env.SNAPSHOTS.objets.keys() ].filter( ( k ) => k === 'latest.json' || k.startsWith( 'index/' ) ).sort();
+		const avant = cles().map( ( k ) => `${ k } ${ sha256( env.SNAPSHOTS.objets.get( k )!.octets ) } ${ JSON.stringify( env.SNAPSHOTS.objets.get( k )!.customMetadata ) }` );
 		expect( ( await commit( env, s ) ).status ).toBe( 200 );
-		expect( [ 'latest.json', 'index/times.json' ].map( ( k ) => sha256( env.SNAPSHOTS.objets.get( k )!.octets ) ) ).toEqual( avant );
+		expect( cles().map( ( k ) => `${ k } ${ sha256( env.SNAPSHOTS.objets.get( k )!.octets ) } ${ JSON.stringify( env.SNAPSHOTS.objets.get( k )!.customMetadata ) }` ) ).toEqual( avant );
 
 		const lu = await appel( env, 'GET', '/v1/latest' );
 		expect( lu.status ).toBe( 200 );
 		expect( lu.corps.snapshot_id ).toBe( s.manifeste.snapshot_id );
+
+	} );
+
+	it( 'index : open_alerts = somme de snapshot.kpi.open_alerts, null (jamais 0) si M4 est inactif', async () => {
+
+		const base = charger( 'capteur_en_derive' ); // kpi.open_alerts = 1 + 1 + 1 + 0
+		const sansM4 = variante( base, 'live_20250112_130000_e44d68da', ( snap ) => { snap.valid_time = '2025-01-12T13:00:00Z'; snap.kpi.open_alerts = null; } );
+		const sansKpi = variante( base, 'live_20250112_140000_e44d68da', ( snap ) => { snap.valid_time = '2025-01-12T14:00:00Z'; snap.kpi = null; } );
+		const zero = variante( base, 'live_20250112_150000_e44d68da', ( snap ) => { snap.valid_time = '2025-01-12T15:00:00Z'; snap.kpi.open_alerts = { information: 0, avertissement: 0, important: 0, critique: 0 }; } );
+		for ( const s of [ base, sansM4, sansKpi, zero ] ) { await deposer( env, s ); expect( ( await commit( env, s ) ).status ).toBe( 200 ); }
+		const parId = Object.fromEntries( ( await times( env ) ).map( ( t ) => [ t.snapshot_id, t.open_alerts ] ) );
+		expect( parId ).toEqual( { [ base.manifeste.snapshot_id ]: 3, [ sansM4.manifeste.snapshot_id ]: null, [ sansKpi.manifeste.snapshot_id ]: null, [ zero.manifeste.snapshot_id ]: 0 } );
+
+	} );
+
+	it( 'commits concurrents : aucune entrée d’index perdue, latest = le plus récent, /v1/times paginé', async () => {
+
+		const base = charger( 'normal' );
+		await deposer( env, base );
+		const heures = [ 13, 9, 17, 11, 15, 10, 16 ];
+		const vs = heures.map( ( h ) => variante( base, `live_20250112_${ String( h ).padStart( 2, '0' ) }0000_e44d68da`, ( snap ) => { snap.valid_time = `2025-01-12T${ String( h ).padStart( 2, '0' ) }:00:00Z`; } ) );
+		for ( const v of vs ) await deposer( env, v );
+		env.SNAPSHOTS.entrelacer = true;
+		for ( let tour = 0; tour < 3; tour ++ ) {
+
+			const rs = await Promise.all( vs.map( ( v ) => commit( env, v ) ) );
+			expect( rs.map( ( r ) => r.status ) ).toEqual( vs.map( () => 200 ) );
+
+		}
+		env.SNAPSHOTS.entrelacer = false;
+		const index = await times( env );
+		expect( index.map( ( t ) => t.valid_time ) ).toEqual( [ ...heures ].sort( ( a, b ) => b - a ).map( ( h ) => `2025-01-12T${ String( h ).padStart( 2, '0' ) }:00:00Z` ) );
+		expect( env.SNAPSHOTS.lireJSON( 'latest.json' ).valid_time ).toBe( '2025-01-12T17:00:00Z' );
+		expect( await times( env, '?from=2025-01-12T10:00:00Z&to=2025-01-12T13:00:00Z' ) ).toHaveLength( 3 );
 
 	} );
 
@@ -211,7 +289,8 @@ describe.skipIf( ! existsSync( racine ) )( 'Worker /v1 (src/v1.js) sur faux R2',
 		const altere = { ...s.manifeste, files: [ ...s.manifeste.files, { path: 'absent.json', bytes: 2, sha256: 'b'.repeat( 64 ) } ] };
 		const r = await appel( env, 'POST', `/v1/publish/${ s.manifeste.snapshot_id }/commit`, JSON.stringify( altere ) );
 		expect( r.status ).toBe( 422 );
-		for ( const k of [ `snapshots/${ s.manifeste.snapshot_id }/_commit.json`, 'latest.json', 'index/times.json' ] ) expect( env.SNAPSHOTS.objets.has( k ), k ).toBe( false );
+		for ( const k of [ `snapshots/${ s.manifeste.snapshot_id }/_commit.json`, 'latest.json' ] ) expect( env.SNAPSHOTS.objets.has( k ), k ).toBe( false );
+		expect( await times( env ) ).toEqual( [] );
 
 	} );
 
@@ -226,7 +305,7 @@ describe.skipIf( ! existsSync( racine ) )( 'Worker /v1 (src/v1.js) sur faux R2',
 		const r = await commit( env, a );
 		expect( r.corps ).toMatchObject( { unchanged: true, latest: false } );
 		expect( env.SNAPSHOTS.lireJSON( 'latest.json' ).snapshot_id ).toBe( b.manifeste.snapshot_id );
-		expect( env.SNAPSHOTS.lireJSON( 'index/times.json' ) ).toHaveLength( 2 );
+		expect( await times( env ) ).toHaveLength( 2 );
 
 	} );
 
@@ -240,7 +319,7 @@ describe.skipIf( ! existsSync( racine ) )( 'Worker /v1 (src/v1.js) sur faux R2',
 		expect( r.status, JSON.stringify( r.corps ) ).toBe( 200 );
 		expect( r.corps ).toMatchObject( { simulation: true, latest: false } );
 		expect( env.SNAPSHOTS.lireJSON( 'latest.json' ).snapshot_id ).toBe( base.manifeste.snapshot_id );
-		expect( env.SNAPSHOTS.lireJSON( 'index/times.json' ).map( ( t: { snapshot_id: string } ) => t.snapshot_id ) ).toEqual( [ base.manifeste.snapshot_id ] );
+		expect( ( await times( env ) ).map( ( t ) => t.snapshot_id ) ).toEqual( [ base.manifeste.snapshot_id ] );
 		const lu = await appel( env, 'GET', `/v1/snapshots/${ sim.manifeste.snapshot_id }` );
 		expect( lu.status ).toBe( 200 );
 		expect( lu.corps.scenario.kind ).toBe( 'panne_zone' );
