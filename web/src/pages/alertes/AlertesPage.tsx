@@ -44,7 +44,24 @@ function AlertCard( { a }: { a: Alert } ) {
 
 }
 
-export function AlertesPage( { alerts }: { alerts: Alerts } ) {
+/** `alerts` = null : snapshot.assets.alerts n'est pas publié pour cet instantané (« non disponible », jamais « 0 alerte »). */
+export function AlertesPage( { alerts }: { alerts: Alerts | null } ) {
+
+	if ( ! alerts ) {
+
+		return (
+			<section className="atom-page" data-testid="page-alertes">
+				<h2>Alertes</h2>
+				<p className="atom-muted" data-testid="no-alerts">Alertes : { NA } (non publiées pour cet instantané).</p>
+			</section>
+		);
+
+	}
+	return <ListeAlertes alerts={ alerts } />;
+
+}
+
+function ListeAlertes( { alerts }: { alerts: Alerts } ) {
 
 	const [ levels, setLevels ] = useState<Set<AlertLevel>>( () => new Set( LEVELS ) );
 	const open = useMemo( () => sortAlerts( alerts.items.filter( ( a ) => a.status === 'ouverte' ) ), [ alerts ] );

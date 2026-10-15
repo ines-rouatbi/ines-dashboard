@@ -6,9 +6,17 @@
 //   headed-gpu  banc de performance, Chrome avec fenêtre et GPU matériel (e2e/tests/perf).
 //               En headless, WebGL passe par un rendu logiciel et les FPS ne veulent rien dire.
 //
-// ATOM_URL : adresse testée. Si elle n'est pas fournie, Playwright lance lui-même le wrangler ÉPINGLÉ
-// de e2e/ (devDependency exacte, npx --no-install) sur la config de la racine, au port ATOM_PORT
-// (défaut 8787), ou réutilise le serveur qui écoute déjà sur ce port (d'où la vérification du titre).
+// ATOM_URL : adresse testée. Si elle n'est pas fournie, Playwright lance lui-même un serveur local au port
+// ATOM_PORT (défaut 8787), ou réutilise celui qui écoute déjà sur ce port (d'où la vérification du titre) :
+//   ATOM_SERVER=vite (défaut)   le Vite de la RACINE (npx --no-install vite), qui sert /v1 depuis
+//                               contract/fixtures/ avec le vrai code du Worker (src/v1.js, faux R2) ;
+//                               ?scenario=<nom> choisit l'instantané de test (cookie de dev). Aucun build,
+//                               aucun R2. Pas de proxy /api : le test « /api en 503 » est sauté.
+//   ATOM_SERVER=wrangler        le wrangler ÉPINGLÉ de e2e/ sur la config de la racine (Worker complet) :
+//                               il faut d'abord « npm run build » à la racine et publier les fixtures
+//                               dans le R2 local (voir e2e/README.md).
+// ATOM_F4_ROUTE (pages Éolien et Alertes) : défini d'office avec le serveur Vite,
+// `<ATOM_URL>/{page}?scenario={scenario}`.
 //
 // Prérequis du projet headed-gpu : Google Chrome installé (channel « chrome »). --use-angle=d3d11
 // ne vaut que sous Windows ; ailleurs, ATOM_ANGLE=metal (macOS) ou vulkan / gl (Linux).
@@ -23,6 +31,10 @@ const onlyOracles = process.argv.some( ( a ) => a === '--project=oracles' ) || p
 // Par défaut Chrome prend le GPU intégré, le cas défavorable qui compte pour V3D10.
 const highPerfGpu = process.env.ATOM_GPU === 'haute-perf';
 const startLocal = ! process.env.ATOM_URL && ! onlyOracles && process.env.ATOM_NO_SERVER !== '1';
+// Serveur testé : vite (défaut, fixtures), wrangler (Worker local), ou externe (ATOM_URL fourni).
+const SERVER = process.env.ATOM_SERVER ?? ( process.env.ATOM_URL ? 'externe' : 'vite' );
+process.env.ATOM_SERVER = SERVER;
+if ( SERVER === 'vite' && ! process.env.ATOM_F4_ROUTE ) process.env.ATOM_F4_ROUTE = `${ ATOM_URL }/{page}?scenario={scenario}`;
 
 export default defineConfig( {
 	timeout: 60_000,
@@ -73,7 +85,10 @@ export default defineConfig( {
 	],
 	webServer: startLocal
 		? {
-			command: `npx --no-install wrangler dev --config ../wrangler.jsonc --port ${ ATOM_PORT } --ip 127.0.0.1`,
+			command: SERVER === 'vite'
+				? `npx --no-install vite --port ${ ATOM_PORT } --strictPort --host 127.0.0.1`
+				: `npx --no-install wrangler dev --config ../wrangler.jsonc --port ${ ATOM_PORT } --ip 127.0.0.1`,
+			cwd: SERVER === 'vite' ? '..' : '.',
 			url: ATOM_URL,
 			reuseExistingServer: true,
 			timeout: 120_000,

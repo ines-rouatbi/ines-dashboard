@@ -196,3 +196,37 @@ export function middlewareFixtures( racineFixtures: string, scenario: string ) {
 	};
 
 }
+
+/** Cookie de dev qui mémorise le scénario choisi par `?scenario=<nom>` (tests e2e, ATOM_F4_ROUTE). */
+export const COOKIE_SCENARIO = 'atom_fixture';
+
+/**
+ * Comme middlewareFixtures, mais le scénario se choisit À L'EXÉCUTION (dev et preview seulement) :
+ *   - `?scenario=<nom>` sur n'importe quelle requête (page ou /v1) choisit ce scénario et le mémorise
+ *     dans le cookie `atom_fixture` (les requêtes /v1 suivantes de la page le suivent) ;
+ *   - sinon le cookie, sinon `defaut` (ATOM_FIXTURE, « normal » par défaut).
+ * Un nom inconnu est ignoré (pas de cookie). Rien de tout cela n'existe dans le Worker de production.
+ */
+export function middlewareFixturesParScenario( racineFixtures: string, defaut: string ) {
+
+	const parScenario = new Map<string, ReturnType<typeof middlewareFixtures>>();
+	const valide = ( sc: string | null | undefined ): sc is string => !! sc && /^[a-z_]+$/.test( sc ) && existsSync( join( racineFixtures, sc, 'latest.json' ) );
+	const pour = ( sc: string ) => {
+
+		let mw = parScenario.get( sc );
+		if ( ! mw ) { mw = middlewareFixtures( racineFixtures, sc ); parScenario.set( sc, mw ); }
+		return mw;
+
+	};
+
+	return ( req: IncomingMessage, res: ServerResponse, next: () => void ) => {
+
+		const demande = new URL( req.url ?? '/', 'http://localhost' ).searchParams.get( 'scenario' );
+		const cookie = new RegExp( `(?:^|;\s*)${ COOKIE_SCENARIO }=([a-z_]+)` ).exec( req.headers.cookie ?? '' )?.[ 1 ];
+		if ( valide( demande ) ) res.setHeader( 'set-cookie', `${ COOKIE_SCENARIO }=${ demande }; Path=/; SameSite=Lax` );
+		const sc = valide( demande ) ? demande : valide( cookie ) ? cookie : defaut;
+		return pour( sc )( req, res, next );
+
+	};
+
+}

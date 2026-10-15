@@ -1,16 +1,25 @@
 {
   "nom": "Relief réel du domaine ATOM-AI (ancrage SUPPOSÉ)",
+  "usage": "FOND DE CARTE seulement. La hauteur au-dessus du sol des nœuds du modèle se calcule avec /v1/terrain/{sha8} (relief du modèle), jamais avec ce fichier (D6).",
+  "meta_source": {
+    "fichier": "contract/fixtures/normal/models/e44d68da/meta.json",
+    "model": "fixture-test",
+    "model_sha256": "e44d68da25fe37103bcbc40f354411b81635a698e87e8eee1ffafac8f6e68348",
+    "data_kind": "test"
+  },
   "ancrage": {
     "lat0": 36,
     "lon0": 9.7,
     "rotation_deg": 0,
-    "coin": "sud-ouest",
+    "m_per_deg_lat": 110574,
+    "m_per_deg_lon": 90059.772,
+    "point": "nœud (0, 0)",
     "suppose": true,
-    "avertissement": "Position SUPPOSÉE : la position réelle du domaine n a pas été fournie (tâche 61). À afficher « position supposée »."
+    "avertissement": "Position SUPPOSÉE tant que georef.suppose vaut true (tâche 61). À afficher « position supposée »."
   },
   "domaine": {
-    "longueur_est_m": 50000,
-    "largeur_nord_m": 25000,
+    "etendue_est_m": 49500,
+    "etendue_nord_m": 24500,
     "coins_latlon": {
       "so": {
         "lat": 36,
@@ -18,39 +27,41 @@
       },
       "se": {
         "lat": 36,
-        "lon": 10.255186838618302
+        "lon": 10.249634969095856
       },
       "no": {
-        "lat": 36.22609293323928,
+        "lat": 36.22157107457449,
         "lon": 9.7
       },
       "ne": {
-        "lat": 36.22609293323928,
-        "lon": 10.255186838618302
+        "lat": 36.22157107457449,
+        "lon": 10.249634969095856
       }
     }
   },
   "grille": {
-    "nx": 500,
-    "ny": 250,
-    "dx_m": 100,
-    "dy_m": 100,
-    "centres": "x = 50 … 49 950 m ; y = 50 … 24 950 m (centres de maille)"
+    "nx": 100,
+    "ny": 50,
+    "dx_m": 500,
+    "dy_m": 500,
+    "x0_m": 0,
+    "y0_m": 0,
+    "noeuds": "x = x0 + i·dx (0 … 49500 m) ; y = y0 + j·dy (0 … 24500 m)"
   },
   "fichier": "domaine-relief-reel.f32",
-  "format": "Float32 little-endian, ny×nx = 250×500, [j][i], j=0 au sud, i=0 à l ouest",
+  "format": "Float32 little-endian, ny×nx = 50×100, [j][i], j=0 au sud, i=0 à l ouest",
   "unite": "m au-dessus du niveau de la mer",
-  "min_m": 34.5,
-  "max_m": 974.5,
+  "min_m": 38.3,
+  "max_m": 978.2,
   "moyenne_m": 258.6,
   "mailles_sous_0m": 0,
-  "methode": "Plan tangent local au coin sud-ouest : lat = lat0 + n/110574 ; lon = lon0 + e/(111320·cos(lat0)), avec (e, n) = rotation de (x, y) de rotation_deg (sens antihoraire depuis l est) ; échantillonnage bilinéaire des tuiles Terrarium au zoom 12 (~31 m à 36° N) au centre de chaque maille de 100 m.",
+  "methode": "Plan tangent équirectangulaire au nœud (0, 0) : lat = lat0 + n/m_per_deg_lat ; lon = lon0 + e/m_per_deg_lon, avec (e, n) = rotation de (x − x0, y − y0) de rotation_deg (sens antihoraire depuis l est) ; échantillonnage bilinéaire des tuiles Terrarium au zoom 12 (~31 m à 36° N) en chaque NŒUD de la grille du meta.",
   "source": {
     "nom": "Terrain Tiles (AWS Open Data, bucket elevation-tiles-prod), format Terrarium PNG",
     "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
     "attribution": "Terrain Tiles, AWS Open Data — sources SRTM, GMTED, ETOPO1 ; Mapzen",
     "zoom": 12
   },
-  "date_extraction": "2026-10-14",
+  "date_extraction": "2026-10-15",
   "outil": "tools/geo/build-tunisia.mjs"
 }

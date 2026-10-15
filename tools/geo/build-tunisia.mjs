@@ -14,7 +14,11 @@
  *   Décodage : élévation (m) = (R·256 + G + B/256) − 32768. Tuiles Web Mercator 256 px.
  *
  * Usage :
- *   cd tools/geo && npm install && node build-tunisia.mjs [--raw <dossier-cache>] [--out <dossier>]
+ *   cd tools/geo && npm install && node build-tunisia.mjs [--meta <meta.json>] [--domaine-seul] [--raw <dossier-cache>] [--out <dossier>]
+ *   --meta : meta.json du contrat v1 (rév. 2) qui fixe la grille et le géoréférencement du domaine
+ *            (GET /v1/meta du modèle enregistré dans un fichier) ; par défaut, celui des instantanés
+ *            de test du contrat (voir meta-contrat.mjs). La grille n'est jamais codée en dur.
+ *   --domaine-seul : ne reconstruit que domaine-relief-reel.* (pas la carte nationale).
  *   --raw : cache des tuiles brutes (défaut : <tmp>/atom-geo-raw). Une tuile présente
  *           n'est jamais retéléchargée.
  *   --out : dossier de sortie (défaut : ../../web/public/geo).
@@ -28,14 +32,16 @@
  *                             côte (isoligne 0 m) #12263A ; nord en haut ; projection équirectangulaire
  *                             à échelle conservée à la latitude moyenne (pixels ~carrés au sol).
  *                             La conversion lat/lon → pixel est décrite dans tunisie-relief.json (« image »).
- *   domaine-relief-reel.f32   Float32 LE, 250×500 ([j][i], j=0 au sud), relief au centre des mailles
- *                             de 100 m du domaine ATOM, zoom 12 (~30 m), bilinéaire.
- *   domaine-relief-reel.json  Statistiques, ancrage SUPPOSÉ, méthode, attribution.
+ *   domaine-relief-reel.f32   Float32 LE, ny×nx ([j][i], j=0 au sud) du meta, relief aux NŒUDS
+ *                             x = x0 + i·dx, y = y0 + j·dy (contrat rév. 2, B2), zoom 12 (~30 m), bilinéaire.
+ *   domaine-relief-reel.json  Grille, ancrage (SUPPOSÉ tant que georef.suppose), statistiques, méthode.
  *
- * Projection du domaine (identique à web/src/geo/tunisia.ts) : plan tangent local au coin
- * sud-ouest (lat0, lon0) ; 1° de latitude = 110 574 m ; 1° de longitude = 111 320·cos(lat0) m ;
- * rotation_deg = rotation de l'axe x du domaine par rapport à l'est géographique, sens
- * trigonométrique (antihoraire). Ancrage par défaut : 36,00 N ; 9,70 E ; rotation 0 — SUPPOSÉ.
+ * Projection du domaine (contrat rév. 2, D4 ; identique à web/src/geo/tunisia.ts) : georef.lat0/lon0 =
+ * nœud (0, 0) ; plan tangent équirectangulaire en ce nœud, m_per_deg_lat et m_per_deg_lon du meta ;
+ * rotation_deg = angle de l'axe x depuis l'Est, sens antihoraire.
+ *
+ * Ce relief n'est qu'un FOND DE CARTE : la hauteur au-dessus du sol d'un nœud du modèle se calcule avec
+ * le relief du modèle (/v1/terrain/{sha8}), jamais avec ce fichier (D6).
  *
  * Dépendance : pngjs (dev, version exacte) pour décoder et encoder les PNG. fetch natif (Node ≥ 18).
  */
@@ -44,6 +50,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
+import { lireMetaContrat } from './meta-contrat.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -70,7 +77,6 @@ const IMG_H = 1400;
 // --- Domaine ATOM ----------------------------------------------------------------------
 export const M_PER_DEG_LAT = 110574;
 export const M_PER_DEG_LON_EQ = 111320;
-const DOMAIN = { lat0: 36.0, lon0: 9.7, rotation_deg: 0, nx: 500, ny: 250, dx: 100, dy: 100 };
 const Z_DOMAIN = 12;
 
 // --- Web Mercator ----------------------------------------------------------------------
@@ -165,15 +171,17 @@ export function elevation(z, lat, lon) {
 }
 
 // --- Domaine : plan tangent local -------------------------------------------------------
-/** (x, y) en m dans le repère du domaine → (lat, lon). Identique à web/src/geo/tunisia.ts. */
-export function domainToLatLon(georef, x, y) {
-	const th = (georef.rotation_deg * Math.PI) / 180;
-	const e = x * Math.cos(th) - y * Math.sin(th);
-	const n = x * Math.sin(th) + y * Math.cos(th);
-	return {
-		lat: georef.lat0 + n / M_PER_DEG_LAT,
-		lon: georef.lon0 + e / (M_PER_DEG_LON_EQ * Math.cos((georef.lat0 * Math.PI) / 180)),
-	};
+/** (x, y) en m dans le repère du contrat → (lat, lon) ; (x0, y0) soustraits. Identique à web/src/geo/tunisia.ts. */
+export function domainToLatLon(meta, x, y) {
+	const g = meta.georef;
+	const th = (g.rotation_deg * Math.PI) / 180;
+	const dx = x - meta.grid.x0_m;
+	const dy = y - meta.grid.y0_m;
+	const e = dx * Math.cos(th) - dy * Math.sin(th);
+	const n = dx * Math.sin(th) + dy * Math.cos(th);
+	const mLat = g.m_per_deg_lat ?? M_PER_DEG_LAT;
+	const mLon = g.m_per_deg_lon ?? M_PER_DEG_LON_EQ * Math.cos((g.lat0 * Math.PI) / 180);
+	return { lat: g.lat0 + n / mLat, lon: g.lon0 + e / mLon };
 }
 
 // --- Utilitaires --------------------------------------------------------------------------
@@ -335,14 +343,16 @@ async function buildCountry(today) {
 }
 
 // --- 2. Domaine ATOM ---------------------------------------------------------------------
-async function buildDomain(today) {
-	const { lat0, lon0, nx, ny, dx, dy } = DOMAIN;
+async function buildDomain(today, M) {
+	const { nx, ny, dx_m: dx, dy_m: dy, x0_m: x0, y0_m: y0 } = M.grid;
+	const { lat0, lon0, rotation_deg } = M.georef;
+	// Coins = nœuds extrêmes (0, 0), (nx−1, 0), (0, ny−1), (nx−1, ny−1).
 	const corners = [
-		[0, 0],
-		[nx * dx, 0],
-		[0, ny * dy],
-		[nx * dx, ny * dy],
-	].map(([x, y]) => domainToLatLon(DOMAIN, x, y));
+		[x0, y0],
+		[x0 + (nx - 1) * dx, y0],
+		[x0, y0 + (ny - 1) * dy],
+		[x0 + (nx - 1) * dx, y0 + (ny - 1) * dy],
+	].map(([x, y]) => domainToLatLon(M, x, y));
 	const lats = corners.map((p) => p.lat);
 	const lons = corners.map((p) => p.lon);
 	const info = await loadTiles(Z_DOMAIN, Math.min(...lats), Math.max(...lats), Math.min(...lons), Math.max(...lons));
@@ -351,7 +361,7 @@ async function buildDomain(today) {
 	const grid = new Float32Array(nx * ny);
 	for (let j = 0; j < ny; j++) {
 		for (let i = 0; i < nx; i++) {
-			const p = domainToLatLon(DOMAIN, (i + 0.5) * dx, (j + 0.5) * dy);
+			const p = domainToLatLon(M, x0 + i * dx, y0 + j * dy); // nœud (i, j), B2
 			grid[j * nx + i] = elevation(Z_DOMAIN, p.lat, p.lon);
 		}
 	}
@@ -361,25 +371,29 @@ async function buildDomain(today) {
 	for (const v of grid) if (v <= 0) below0++;
 	const meta = {
 		nom: 'Relief réel du domaine ATOM-AI (ancrage SUPPOSÉ)',
+		usage: 'FOND DE CARTE seulement. La hauteur au-dessus du sol des nœuds du modèle se calcule avec /v1/terrain/{sha8} (relief du modèle), jamais avec ce fichier (D6).',
+		meta_source: { fichier: path.relative(path.resolve(HERE, '../..'), M.fichier).split(path.sep).join('/'), ...M.modele },
 		ancrage: {
 			lat0,
 			lon0,
-			rotation_deg: DOMAIN.rotation_deg,
-			coin: 'sud-ouest',
-			suppose: true,
-			avertissement: 'Position SUPPOSÉE : la position réelle du domaine n a pas été fournie (tâche 61). À afficher « position supposée ».',
+			rotation_deg,
+			m_per_deg_lat: M.georef.m_per_deg_lat ?? M_PER_DEG_LAT,
+			m_per_deg_lon: M.georef.m_per_deg_lon ?? round(M_PER_DEG_LON_EQ * Math.cos((lat0 * Math.PI) / 180), 3),
+			point: 'nœud (0, 0)',
+			suppose: M.georef.suppose !== false,
+			avertissement: 'Position SUPPOSÉE tant que georef.suppose vaut true (tâche 61). À afficher « position supposée ».',
 		},
-		domaine: { longueur_est_m: nx * dx, largeur_nord_m: ny * dy, coins_latlon: { so: corners[0], se: corners[1], no: corners[2], ne: corners[3] } },
-		grille: { nx, ny, dx_m: dx, dy_m: dy, centres: 'x = 50 … 49 950 m ; y = 50 … 24 950 m (centres de maille)' },
+		domaine: { etendue_est_m: (nx - 1) * dx, etendue_nord_m: (ny - 1) * dy, coins_latlon: { so: corners[0], se: corners[1], no: corners[2], ne: corners[3] } },
+		grille: { nx, ny, dx_m: dx, dy_m: dy, x0_m: x0, y0_m: y0, noeuds: `x = x0 + i·dx (${x0} … ${x0 + (nx - 1) * dx} m) ; y = y0 + j·dy (${y0} … ${y0 + (ny - 1) * dy} m)` },
 		fichier: 'domaine-relief-reel.f32',
-		format: 'Float32 little-endian, ny×nx = 250×500, [j][i], j=0 au sud, i=0 à l ouest',
+		format: `Float32 little-endian, ny×nx = ${ny}×${nx}, [j][i], j=0 au sud, i=0 à l ouest`,
 		unite: 'm au-dessus du niveau de la mer',
 		min_m: round(s.min, 1),
 		max_m: round(s.max, 1),
 		moyenne_m: round(s.mean, 1),
 		mailles_sous_0m: below0,
 		methode:
-			'Plan tangent local au coin sud-ouest : lat = lat0 + n/110574 ; lon = lon0 + e/(111320·cos(lat0)), avec (e, n) = rotation de (x, y) de rotation_deg (sens antihoraire depuis l est) ; échantillonnage bilinéaire des tuiles Terrarium au zoom 12 (~31 m à 36° N) au centre de chaque maille de 100 m.',
+			'Plan tangent équirectangulaire au nœud (0, 0) : lat = lat0 + n/m_per_deg_lat ; lon = lon0 + e/m_per_deg_lon, avec (e, n) = rotation de (x − x0, y − y0) de rotation_deg (sens antihoraire depuis l est) ; échantillonnage bilinéaire des tuiles Terrarium au zoom 12 (~31 m à 36° N) en chaque NŒUD de la grille du meta.',
 		source: { ...SOURCE, zoom: Z_DOMAIN },
 		date_extraction: today,
 		outil: 'tools/geo/build-tunisia.mjs',
@@ -393,9 +407,10 @@ async function main() {
 	fs.mkdirSync(RAW, { recursive: true });
 	fs.mkdirSync(OUT, { recursive: true });
 	const today = new Date().toISOString().slice(0, 10);
-	console.log(`cache : ${RAW}\nsortie : ${OUT}`);
-	await buildCountry(today);
-	await buildDomain(today);
+	const M = lireMetaContrat(args);
+	console.log(`cache : ${RAW}\nsortie : ${OUT}\nmeta : ${M.fichier} (${M.grid.nx}×${M.grid.ny} à ${M.grid.dx_m} m)`);
+	if (!args.includes('--domaine-seul')) await buildCountry(today);
+	await buildDomain(today, M);
 	console.log(`tuiles téléchargées : ${nDownloaded}, lues en cache : ${nCached}`);
 }
 

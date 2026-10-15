@@ -5,6 +5,7 @@ import { ROUTES, naviguer, useRoute, type PageId } from './routes';
 import { texteBandeau } from '../domain/freshness';
 import { EnConstruction } from '../pages/EnConstruction';
 import { Exploration } from '../pages/Exploration';
+import { Alertes, Eolien } from '../pages/F4';
 import type { JSX } from 'react';
 
 function Pastille( { s }: { s: EtatLatest } ) {
@@ -56,8 +57,8 @@ export function App() {
 		ensemble: () => <EnConstruction titre="Vue d'ensemble" />,
 		exploration: () => <Exploration latest={ latest } />,
 		fiabilite: () => <EnConstruction titre="Fiabilité" />,
-		eolien: () => <EnConstruction titre="Éolien" />,
-		alertes: () => <EnConstruction titre="Alertes" />,
+		eolien: () => <Eolien latest={ latest } />,
+		alertes: () => <Alertes latest={ latest } />,
 		modele: () => <EnConstruction titre="Modèle" />,
 	};
 

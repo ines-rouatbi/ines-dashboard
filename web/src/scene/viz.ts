@@ -57,7 +57,8 @@ export class Viz {
 	readonly canvas: HTMLCanvasElement;
 	onPick?: OnPick;
 	meta: SceneMeta | null = null;
-	range: [ number, number ] = [ 0, 1 ];
+	/** Échelle de vitesse horizontale du plan affiché ; null si aucun nœud valide (pas d'échelle fictive). */
+	range: [ number, number ] | null = null;
 
 	readonly renderer: THREE.WebGLRenderer;
 	readonly scene: THREE.Scene;
@@ -241,7 +242,7 @@ export class Viz {
 
 	// Met à jour les flèches pour un plan (un niveau). Le champ est déjà échantillonné :
 	// on dessine une flèche par cellule valide reçue.
-	setField( field: Plan, { vertical = false }: { vertical?: boolean } = {} ): { range: [ number, number ]; shown: number } | undefined {
+	setField( field: Plan, { vertical = false }: { vertical?: boolean } = {} ): { range: [ number, number ] | null; shown: number } | undefined {
 
 		if ( ! this.arrows || ! this.pickPlane ) return;
 		const { nx, ny, u, v, w, mask, altitude } = field;
@@ -253,11 +254,11 @@ export class Viz {
 		this.pickPlane.position.y = y;
 		this.currentAltScene = y;
 
-		// Échelle min/max de vitesse (en excluant le relief).
+		// Échelle min/max de vitesse HORIZONTALE ‖(u, v)‖ (= speed du contrat), relief exclu. Aucun nœud
+		// valide (niveau entièrement sous le relief) : pas d'échelle (null), aucune flèche.
 		let lo = Infinity, hi = - Infinity;
-		for ( let i = 0; i < mask.length; i ++ ) if ( mask[ i ] ) { const s = Math.hypot( u[ i ], v[ i ], w[ i ] ); if ( s < lo ) lo = s; if ( s > hi ) hi = s; }
-		if ( ! isFinite( lo ) ) { lo = 0; hi = 1; }
-		this.range = [ lo, hi ];
+		for ( let i = 0; i < mask.length; i ++ ) if ( mask[ i ] ) { const s = Math.hypot( u[ i ], v[ i ] ); if ( s < lo ) lo = s; if ( s > hi ) hi = s; }
+		this.range = isFinite( lo ) ? [ lo, hi ] : null;
 
 		const up = new THREE.Vector3( 0, 1, 0 );
 		const dirV = new THREE.Vector3();
@@ -272,13 +273,13 @@ export class Viz {
 				if ( ! mask[ idx ] ) { this._dummy.position.set( 0, -9999, 0 ); this._dummy.scale.set( 0, 0, 0 ); this._dummy.updateMatrix(); this.arrows.setMatrixAt( idx, this._dummy.matrix ); continue; }
 
 				const wu = u[ idx ], wv = v[ idx ], ww = vertical ? w[ idx ] : 0;
-				const speed = Math.hypot( u[ idx ], v[ idx ], w[ idx ] );
+				const speed = Math.hypot( u[ idx ], v[ idx ] );
 				dirV.set( wu, ww, - wv );
 				if ( dirV.lengthSq() < 1e-9 ) dirV.set( 0, 1, 0 );
 				dirV.normalize();
 				q.setFromUnitVectors( up, dirV );
 
-				const t = ( speed - lo ) / ( hi - lo || 1 );
+				const t = ( speed - lo ) / ( ( hi - lo ) || 1 );
 				const len = 1.6 + 3.8 * t;            // longueur par vitesse
 				const pos = this._cellToScene( ix, iy, y, field );
 

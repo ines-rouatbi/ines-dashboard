@@ -6,13 +6,15 @@
  * à son ancrage SUPPOSÉ (cadre magenta), et imprime pour chaque ville le pixel, l'altitude de la
  * grille et la distance approximative à la mer la plus proche.
  *
- * Usage : node controle-carte.mjs --out <fichier.png>   (à écrire hors du dépôt)
+ * Usage : node --experimental-strip-types controle-carte.mjs --out <fichier.png> [--meta <meta.json>]
+ *         (image à écrire hors du dépôt ; domaine lu dans le meta du contrat, voir meta-contrat.mjs)
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import { domainCorners, latLonToPixel, reliefAt } from '../../web/src/geo/tunisia.ts';
+import { lireMetaContrat } from './meta-contrat.mjs';
 
 const GEO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/public/geo');
 const k = process.argv.indexOf('--out');
@@ -44,7 +46,7 @@ const line = (a, c, col) => {
 };
 
 // Domaine (ancrage supposé)
-const corners = domainCorners({ lat0: 36, lon0: 9.7, rotation_deg: 0 }).map((p) => latLonToPixel(meta.image, p.lat, p.lon));
+const corners = domainCorners(lireMetaContrat()).map((p) => latLonToPixel(meta.image, p.lat, p.lon));
 for (let s = 0; s < 4; s++) line(corners[s], corners[(s + 1) % 4], [220, 0, 200]);
 
 const seaDistKm = (lat, lon) => {
