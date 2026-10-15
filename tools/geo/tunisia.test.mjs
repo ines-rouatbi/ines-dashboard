@@ -14,7 +14,9 @@ import {
 	reliefAt,
 	loadTunisia,
 	loadDomainRelief,
+	positionNoeud,
 } from '../../web/src/geo/tunisia.ts';
+import { lireMetaContrat } from './meta-contrat.mjs';
 
 const GEO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/public/geo');
 // fetch local : lit les fichiers du dossier web/public/geo
@@ -30,20 +32,34 @@ const localFetch = async (url) => {
 };
 const near = (a, b, tol) => assert.ok(Math.abs(a - b) <= tol, `${a} ≠ ${b} ± ${tol}`);
 
-test('coins du domaine, ancrage supposé 36,00 N ; 9,70 E ; rotation 0', () => {
-	const [so, se, ne, no] = domainCorners({ lat0: 36, lon0: 9.7, rotation_deg: 0 });
-	near(so.lat, 36, 1e-12);
-	near(so.lon, 9.7, 1e-12);
-	near(se.lat, 36, 1e-12);
-	near(se.lon, 9.7 + 50000 / (111320 * Math.cos((36 * Math.PI) / 180)), 1e-9);
-	near(ne.lat, 36 + 25000 / 110574, 1e-9);
-	near(ne.lon, se.lon, 1e-12);
-	near(no.lat, ne.lat, 1e-12);
-	near(no.lon, 9.7, 1e-12);
+const META = lireMetaContrat([]); // meta des instantanés de test du contrat (grille 100 × 50 à 500 m)
+
+test('coins du domaine = nœuds extrêmes de la grille du meta (x0 + i·dx), = georef.bounds', () => {
+	const [so, se, ne, no] = domainCorners(META);
+	const b = META.georef.bounds;
+	near(so.lat, b.lat_min, 1e-6);
+	near(so.lon, b.lon_min, 1e-6);
+	near(se.lon, b.lon_max, 1e-6);
+	near(ne.lat, b.lat_max, 1e-6);
+	near(no.lon, so.lon, 1e-12);
+	near(se.lat, so.lat, 1e-12);
+	// (nx − 1)·dx, pas nx·dx : 49 500 m pour la grille de test.
+	near(se.lon - so.lon, ((META.grid.nx - 1) * META.grid.dx_m) / META.georef.m_per_deg_lon, 1e-9);
+});
+
+test('x0 et y0 soustraits : le nœud (0, 0) est en lat0/lon0 même si x0, y0 ≠ 0', () => {
+	const m = { grid: { ...META.grid, x0_m: 1000, y0_m: -500 }, georef: { lat0: 36, lon0: 9.7, rotation_deg: 0 } };
+	const p0 = positionNoeud(m, 0, 0);
+	assert.deepEqual(p0, { x: 1000, y: -500 });
+	const q = domainToLatLon(m, p0.x, p0.y);
+	near(q.lat, 36, 1e-12);
+	near(q.lon, 9.7, 1e-12);
+	const p1 = domainToLatLon(m, 1000 + META.grid.dx_m, -500);
+	near(p1.lon, 9.7 + META.grid.dx_m / (111320 * Math.cos((36 * Math.PI) / 180)), 1e-9);
 });
 
 test('rotation de 90° : l axe x du domaine pointe vers le nord', () => {
-	const p = domainToLatLon({ lat0: 36, lon0: 9.7, rotation_deg: 90 }, 10000, 0);
+	const p = domainToLatLon({ grid: { ...META.grid, x0_m: 0, y0_m: 0 }, georef: { lat0: 36, lon0: 9.7, rotation_deg: 90 } }, 10000, 0);
 	near(p.lat, 36 + 10000 / 110574, 1e-9);
 	near(p.lon, 9.7, 1e-9);
 });
@@ -90,11 +106,14 @@ test('fichiers : relief national cohérent, Jebel Chambi ~1 500 m, Tunis et Sous
 	}
 });
 
-test('fichiers : relief réel du domaine (ancrage supposé)', async () => {
+test('fichiers : relief réel du domaine aux nœuds de la grille du meta (ancrage supposé, fond de carte)', async () => {
 	const d = await loadDomainRelief('/geo/', localFetch);
-	assert.equal(d.nx, 500);
-	assert.equal(d.ny, 250);
+	// Construit avec le meta de test du contrat : même grille, nœuds en x0 + i·dx (B2), pas de centres de maille.
+	assert.deepEqual([d.nx, d.ny], [META.grid.nx, META.grid.ny]);
+	for (const c of ['dx_m', 'dy_m', 'x0_m', 'y0_m']) assert.equal(d.meta.grille[c], META.grid[c], c);
 	assert.equal(d.meta.ancrage.suppose, true);
+	assert.match(d.meta.usage, /FOND DE CARTE/);
+	assert.match(d.meta.usage, /\/v1\/terrain/);
 	let min = Infinity;
 	let max = -Infinity;
 	for (const v of d.relief) {
