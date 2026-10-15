@@ -44,6 +44,7 @@ Le drapeau `--use-angle` vaut `d3d11` sous Windows, `metal` sous macOS, `gl` ail
 | `ATOM_PORT` | `8787` | Port du serveur lancé par Playwright (Vite ou `wrangler dev`). |
 | `ATOM_SERVER` | `vite` | `vite` (fixtures du contrat) ou `wrangler` (Worker local) ; voir « Serveur testé ». |
 | `ATOM_F4_ROUTE` | `<ATOM_URL>/{page}?scenario={scenario}` avec Vite | Gabarit d'URL des pages Éolien et Alertes ; sans lui, leurs tests navigateur sont sautés. |
+| `ATOM_F3_ROUTE` | `ATOM_F4_ROUTE` | Gabarit d'URL des pages F3 (`{page}` = vide pour la Vue d'ensemble, `fiabilite`, `modele`) ; `pages-f3.spec.ts` y vérifie aussi VIS1 (`window.__atom.vis1`, moins de 3 s). |
 | `ATOM_REQUIRE_API` | — | `1` (CI, et dès F0) : l'absence de `window.__atom`, ou un `ready` rejeté, fait **échouer** le banc au lieu de le sauter ou de mesurer la visionneuse historique. |
 | `ATOM_MACHINE` | `non renseigné` | Libellé du poste écrit dans le rapport (pas de nom d'hôte automatique : les références sont commitées). |
 | `ATOM_ANGLE` | selon l'OS | Moteur ANGLE de Chrome (`d3d11`, `metal`, `vulkan`, `gl`). |
