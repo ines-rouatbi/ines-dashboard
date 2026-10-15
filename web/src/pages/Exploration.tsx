@@ -28,6 +28,7 @@ import { Legende } from '../ui/Legende';
 import { Frise } from '../ui/Frise';
 import { CarteSituation } from '../ui/CarteSituation';
 import type { EtatLatest } from '../ui/useLatest';
+import { utc } from './shared/format';
 
 // Caches partagés : ils survivent à la navigation entre les pages.
 const champs = new CacheChamps( api );
@@ -679,7 +680,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 					{ snap ? (
 						<dl className="grille-cles num">
 							<dt>Identifiant</dt><dd>{ snap.snapshot_id }</dd>
-							<dt>Instant de validité</dt><dd>{ new Date( snap.valid_time ).toLocaleString( 'fr-FR' ) }</dd>
+							<dt>Instant de validité</dt><dd>{ utc( snap.valid_time ) }</dd>
 							<dt>Modèle</dt><dd>{ snap.versions.model }</dd>
 							<dt>Grille</dt><dd>{ dom ? `${ dom.nx } × ${ dom.ny } × ${ dom.nz }` : '—' }</dd>
 							<dt>Domaine</dt><dd>{ dom ? `${ fmt( dom.sizeX / 1000, 1 ) } × ${ fmt( dom.sizeY / 1000, 1 ) } km` : '—' }</dd>
