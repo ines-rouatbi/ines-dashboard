@@ -8,6 +8,15 @@
 // bascule qu'après un commit d'instantané conforme.
 // Contrat : contract/openapi.yaml, contract/README.md, contract/DECISIONS-rev2.md.
 //
+// Règles de bascule de latest (commit d'instantané) :
+//   - un commit refusé (422) n'écrit RIEN : ni _commit.json, ni index, ni latest ;
+//   - un commit rejoué (_commit.json déjà présent, par ex. après une panne entre _commit.json et latest)
+//     refait, de façon idempotente, l'écriture de l'index puis de latest à partir du _commit.json stocké ;
+//   - une simulation (snapshot.json : scenario non null, BF45 et BF46) est publiée et lisible par son
+//     identifiant, mais n'entre ni dans latest ni dans index/times.json (frise des reconstructions) ;
+//   - un instantané de test (versions.data_kind = "test", D15) est refusé, sauf si la variable de dev
+//     ATOM_ALLOW_TEST_SNAPSHOTS vaut "1" (wrangler dev --var ATOM_ALLOW_TEST_SNAPSHOTS:1). Jamais en production.
+//
 // Disposition R2 :
 //   models/<sha8>/<path>           fichiers par modèle (meta.json, terrain.f32)
 //   models/<sha8>/_commit.json     manifeste vérifié (présent = modèle immuable)
@@ -37,6 +46,17 @@ const json = ( body, status = 200, extra = {} ) => new Response( JSON.stringify(
 	status, headers: { 'content-type': JSON_TYPE, 'cache-control': 'no-store', ...extra },
 } );
 const err = ( status, error, message ) => json( { error, message }, status );
+const testAutorise = ( env ) => env.ATOM_ALLOW_TEST_SNAPSHOTS === '1';
+const refusTest = () => err( 422, 'instantane_de_test', 'Données de test (versions.data_kind = "test") refusées par ce Worker (ATOM_ALLOW_TEST_SNAPSHOTS absent).' );
+
+// Erreur interne : détail journalisé côté Worker, réponse générique avec une référence pour le retrouver.
+function erreurInterne( e ) {
+
+	const ref = crypto.randomUUID().slice( 0, 8 );
+	console.error( `[v1] erreur interne ${ ref } :`, e?.stack ?? e );
+	return json( { error: 'erreur_interne', message: `Erreur interne (référence ${ ref }).`, ref }, 500 );
+
+}
 const putJSON = ( b, key, doc ) => b.put( key, JSON.stringify( doc ), { httpMetadata: { contentType: 'application/json' } } );
 
 async function readJSON( bucket, key ) {
@@ -126,6 +146,52 @@ async function readRange( b, key, offset, length ) {
 	if ( ! o ) return null;
 	const buf = await o.arrayBuffer();
 	return buf.byteLength === length ? buf : null;
+
+}
+
+// Lecture « en peigne » : `count` valeurs de `n` octets espacées de `stride` octets à partir de `start`,
+// en UNE seule lecture R2 (plage [start, start + (count−1)·stride + n[), lue en flux : seuls les octets
+// utiles sont gardés en mémoire. Renvoie un tableau de `count` ArrayBuffer de n octets, ou null.
+async function readStrided( b, key, start, count, stride, n ) {
+
+	if ( count <= 0 ) return [];
+	const length = ( count - 1 ) * stride + n;
+	const o = await b.get( key, { range: { offset: start, length } } );
+	if ( ! o ) return null;
+	const out = Array.from( { length: count }, () => new Uint8Array( n ) );
+	const take = ( chunk, pos ) => {
+
+		// Copie les octets du morceau [pos, pos + chunk.length[ qui tombent dans une valeur utile.
+		const end = pos + chunk.length;
+		for ( let k = Math.max( 0, Math.floor( ( pos - n + 1 ) / stride ) ); k < count && k * stride < end; k ++ ) {
+
+			const a = Math.max( k * stride, pos ), z = Math.min( k * stride + n, end );
+			for ( let p = a; p < z; p ++ ) out[ k ][ p - k * stride ] = chunk[ p - pos ];
+
+		}
+
+	};
+	let pos = 0;
+	const reader = o.body && typeof o.body.getReader === 'function' ? o.body.getReader() : null;
+	if ( reader ) {
+
+		for ( ;; ) {
+
+			const { done, value } = await reader.read();
+			if ( done ) break;
+			take( value, pos );
+			pos += value.byteLength;
+
+		}
+
+	} else {
+
+		const all = new Uint8Array( await o.arrayBuffer() );
+		take( all, 0 );
+		pos = all.byteLength;
+
+	}
+	return pos === length ? out.map( ( u ) => u.buffer ) : null;
 
 }
 
@@ -240,19 +306,27 @@ async function handleRead( request, env, parts, url ) {
 		const i = Number( iq ), j = Number( jq );
 		if ( ! /^\d+$/.test( iq ?? '' ) || ! /^\d+$/.test( jq ?? '' ) || i >= nx || j >= ny ) return err( 422, 'requete_invalide', `Attendu ?i=0..${ nx - 1 }&j=0..${ ny - 1 }` );
 		const idx = j * nx + i, NN = nx * ny;
-		const reads = [ readRange( b, `models/${ sha8 }/terrain.f32`, idx * 4, 4 ) ];
-		for ( const v of meta.fields ) {
+		// Sous-requêtes R2 : 1 pour le relief, puis UNE lecture « en peigne » par variable (valeurs aux
+		// indices k·ny·nx + j·nx + i, D13), soit 1 + len(meta.fields) au lieu de 1 + nz·len(meta.fields).
+		// Les niveaux sous min_agl_m sont absents par contrat (null) : ils ne sont pas lus.
+		const tb = await readRange( b, `models/${ sha8 }/terrain.f32`, idx * 4, 4 );
+		if ( ! tb ) return err( 404, 'absent', 'Relief incomplet.' );
+		const zt = new DataView( tb ).getFloat32( 0, true );
+		const levels = g.levels_asl_m.map( ( z ) => ( { z_asl_m: z, z_agl_m: z - zt, below_terrain: z - zt < g.min_agl_m } ) );
+		let k0 = levels.findIndex( ( l ) => ! l.below_terrain );
+		if ( k0 < 0 ) k0 = nz;
+		const cols = await Promise.all( meta.fields.map( ( v ) => {
 
 			const enc = meta.encoding[ v ], n = dtypeBytes( enc );
-			for ( let k = 0; k < nz; k ++ ) reads.push( readRange( b, `snapshots/${ s.id }/${ enc.file }`, ( k * NN + idx ) * n, n ) );
+			return readStrided( b, `snapshots/${ s.id }/${ enc.file }`, ( k0 * NN + idx ) * n, nz - k0, NN * n, n );
 
-		}
-		const bufs = await Promise.all( reads );
-		if ( bufs.some( ( x ) => x === null ) ) return err( 404, 'absent', 'Fichier de champ ou relief incomplet.' );
-		const zt = new DataView( bufs[ 0 ] ).getFloat32( 0, true );
-		const levels = g.levels_asl_m.map( ( z ) => ( { z_asl_m: z, z_agl_m: z - zt, below_terrain: z - zt < g.min_agl_m } ) );
-		let r = 1;
-		for ( const v of meta.fields ) for ( let k = 0; k < nz; k ++ ) levels[ k ][ v ] = decode( bufs[ r ++ ], meta.encoding[ v ] );
+		} ) );
+		if ( cols.some( ( x ) => x === null ) ) return err( 404, 'absent', 'Fichier de champ incomplet.' );
+		meta.fields.forEach( ( v, f ) => {
+
+			for ( let k = 0; k < nz; k ++ ) levels[ k ][ v ] = k < k0 ? null : decode( cols[ f ][ k - k0 ], meta.encoding[ v ] );
+
+		} );
 		return json( { i, j, x_m: g.x0_m + i * g.dx_m, y_m: g.y0_m + j * g.dy_m, z_terrain_m: zt, levels }, 200, { 'cache-control': s.immutable ? IMMUTABLE : 'no-store' } );
 
 	}
@@ -277,8 +351,10 @@ async function putFile( request, b, prefix, committed, rel ) {
 	if ( ! PATH_RE.test( rel ) ) return err( 422, 'chemin_invalide', rel );
 	const declared = ( request.headers.get( 'x-content-sha256' ) || '' ).toLowerCase();
 	if ( ! /^[0-9a-f]{64}$/.test( declared ) ) return err( 422, 'sha256_absent', 'En-tête X-Content-SHA256 obligatoire.' );
-	const len = Number( request.headers.get( 'content-length' ) || 0 );
-	if ( len > MAX_BYTES ) return err( 413, 'trop_gros', `${ MAX_BYTES } octets maximum par fichier.` );
+	// Content-Length obligatoire : un corps de taille inconnue (transfert par morceaux) n'est jamais lu.
+	const cl = request.headers.get( 'content-length' );
+	if ( cl === null || ! /^\d+$/.test( cl ) ) return err( 411, 'longueur_requise', 'En-tête Content-Length obligatoire.' );
+	if ( Number( cl ) > MAX_BYTES ) return err( 413, 'trop_gros', `${ MAX_BYTES } octets maximum par fichier.` );
 
 	const key = `${ prefix }/${ rel }`;
 	const existing = await b.head( key );
@@ -312,12 +388,13 @@ async function verifyFiles( b, prefix, files ) {
 }
 const refused = ( problems ) => json( { error: 'publication_refusee', message: 'Rien n’a changé.', problems: problems.slice( 0, 50 ) }, 422 );
 
-async function commitModel( request, b, sha8, committed ) {
+async function commitModel( request, b, sha8, committed, env ) {
 
 	if ( committed ) return json( { ok: true, model_sha8: sha8, unchanged: true } );
 	let m;
 	try { m = await request.json(); } catch { return err( 422, 'json_invalide', 'Manifeste illisible.' ); }
 	if ( m?.model_sha8 !== sha8 || ! Array.isArray( m.files ) || ! m.versions?.model_sha256?.startsWith( sha8 ) ) return err( 422, 'manifeste_invalide', 'Voir contract/schemas/model-manifest.schema.json' );
+	if ( m.versions.data_kind === 'test' && ! testAutorise( env ) ) return refusTest();
 	const listed = new Set( m.files.map( ( f ) => f.path ) );
 	const problems = [ 'meta.json', 'terrain.f32' ].filter( ( p ) => ! listed.has( p ) ).map( ( p ) => `${ p } : absent du manifeste` );
 	if ( problems.length ) return refused( problems );
@@ -332,6 +409,7 @@ async function commitModel( request, b, sha8, committed ) {
 
 		if ( terrain.size !== g.nx * g.ny * 4 ) problems.push( `terrain.f32 : ${ terrain.size } octets, attendu nx·ny·4 = ${ g.nx * g.ny * 4 }` );
 		if ( meta.terrain?.sha256 !== terrain.customMetadata?.sha256 ) problems.push( 'terrain.f32 : sha256 ≠ meta.terrain.sha256' );
+		if ( meta.versions?.data_kind !== m.versions.data_kind ) problems.push( 'meta.json : versions.data_kind différent du manifeste' );
 		for ( const v of meta.fields ?? [] ) if ( ! meta.encoding?.[ v ] ) problems.push( `meta.encoding.${ v } absent` );
 
 	}
@@ -341,14 +419,52 @@ async function commitModel( request, b, sha8, committed ) {
 
 }
 
-async function commitSnapshot( request, b, id, committed ) {
+// Après _commit.json : index puis latest. Idempotent (rejouable à l'identique depuis le _commit.json stocké).
+//   - simulation : ni index ni latest ;
+//   - latest ne recule jamais : il bascule si valid_time est plus récent, ou égal avec une publication
+//     au moins aussi récente (un commit rejoué d'un instantané plus ancien ne reprend pas la main).
+async function finaliser( b, c ) {
 
-	// Commit rejoué (réponse perdue côté client) : succès idempotent, rien ne change.
-	if ( committed ) return json( { ok: true, snapshot_id: id, unchanged: true } );
+	const id = c.snapshot_id;
+	if ( c.simulation ) return { latest: false, index: false };
+	const alerts = await readJSON( b, `snapshots/${ id }/alerts.json` );
+	const openAlerts = Array.isArray( alerts?.items ) ? alerts.items.filter( ( x ) => x.status === 'ouverte' ).length : null;
+	const times = ( ( await readJSON( b, 'index/times.json' ) ) ?? [] ).filter( ( t ) => t.snapshot_id !== id );
+	times.push( { snapshot_id: id, valid_time: c.valid_time, open_alerts: openAlerts } );
+	times.sort( ( p, q ) => ( p.valid_time < q.valid_time ? 1 : p.valid_time > q.valid_time ? - 1 : 0 ) );
+	await putJSON( b, 'index/times.json', times );
+	const current = await readJSON( b, 'latest.json' );
+	const bascule = ! current || current.valid_time < c.valid_time
+		|| ( current.valid_time === c.valid_time && ( current.snapshot_id === id || ( current.published_at ?? '' ) <= c.published_at ) );
+	if ( bascule ) {
+
+		await putJSON( b, 'latest.json', {
+			snapshot_id: id, valid_time: c.valid_time, generated_at: c.generated_at ?? c.published_at, published_at: c.published_at,
+			last_observation_at: c.last_observation_at ?? null, data_status: c.data_status, versions: c.versions, href: `/v1/snapshots/${ id }`,
+		} );
+
+	}
+	return { latest: bascule, index: true };
+
+}
+
+async function commitSnapshot( request, b, id, committed, env ) {
+
+	// Commit rejoué (réponse perdue, ou panne entre _commit.json et latest) : l'instantané est déjà vérifié
+	// et immuable ; on refait seulement, de façon idempotente, l'index et latest depuis le _commit.json stocké.
+	if ( committed ) {
+
+		const c = await readJSON( b, `snapshots/${ id }/_commit.json` );
+		if ( ! c ) return err( 404, 'absent', '_commit.json illisible.' );
+		const f = await finaliser( b, c );
+		return json( { ok: true, snapshot_id: id, published_at: c.published_at, unchanged: true, simulation: Boolean( c.simulation ), latest: f.latest } );
+
+	}
 	let m;
 	try { m = await request.json(); } catch { return err( 422, 'json_invalide', 'Manifeste illisible.' ); }
 	if ( m?.snapshot_id !== id || ! Array.isArray( m.files ) || m.files.length === 0 || ! m.valid_time || ! m.versions ) return err( 422, 'manifeste_invalide', 'Voir contract/schemas/publish-manifest.schema.json' );
 	if ( ! DATA_STATUS.has( m.data_status ) ) return err( 422, 'manifeste_invalide', 'data_status obligatoire : complete | degrade' );
+	if ( m.versions.data_kind === 'test' && ! testAutorise( env ) ) return refusTest();
 	const sha8 = id.slice( - 8 );
 	if ( m.versions.model_sha256?.slice( 0, 8 ) !== sha8 ) return err( 422, 'manifeste_invalide', 'snapshot_id ne finit pas par le sha8 de versions.model_sha256' );
 	const meta = await modelMeta( b, sha8 );
@@ -371,22 +487,20 @@ async function commitSnapshot( request, b, id, committed ) {
 	problems.push( ...await verifyFiles( b, `snapshots/${ id }`, m.files ) );
 	if ( problems.length ) return refused( problems );
 
-	const publishedAt = new Date().toISOString();
-	const latestDoc = {
-		snapshot_id: id, valid_time: m.valid_time, generated_at: m.generated_at ?? publishedAt, published_at: publishedAt,
-		last_observation_at: m.last_observation_at ?? null, data_status: m.data_status, versions: m.versions, href: `/v1/snapshots/${ id }`,
-	};
-	// Ordre : d'abord l'instantané devient immuable, puis l'index, puis latest en dernier.
-	await putJSON( b, `snapshots/${ id }/_commit.json`, { ...m, published_at: publishedAt } );
-	const alerts = await readJSON( b, `snapshots/${ id }/alerts.json` );
-	const openAlerts = Array.isArray( alerts?.items ) ? alerts.items.filter( ( x ) => x.status === 'ouverte' ).length : null;
-	const times = ( ( await readJSON( b, 'index/times.json' ) ) ?? [] ).filter( ( t ) => t.snapshot_id !== id );
-	times.push( { snapshot_id: id, valid_time: m.valid_time, open_alerts: openAlerts } );
-	times.sort( ( p, q ) => ( p.valid_time < q.valid_time ? 1 : p.valid_time > q.valid_time ? - 1 : 0 ) );
-	await putJSON( b, 'index/times.json', times );
-	const current = await readJSON( b, 'latest.json' );
-	if ( ! current || current.valid_time <= m.valid_time ) await putJSON( b, 'latest.json', latestDoc );
-	return json( { ok: true, snapshot_id: id, published_at: publishedAt, files: m.files.length } );
+	// snapshot.json (vérifié ci-dessus) : même identifiant, même nature des données ; scenario ≠ null = simulation.
+	let snap = null;
+	try { snap = await readJSON( b, `snapshots/${ id }/snapshot.json` ); } catch { /* signalé ci-dessous */ }
+	if ( ! snap || typeof snap !== 'object' ) return refused( [ 'snapshot.json : illisible' ] );
+	if ( snap.snapshot_id !== id ) problems.push( `snapshot.json : snapshot_id ${ snap.snapshot_id } ≠ ${ id }` );
+	if ( snap.versions?.data_kind !== m.versions.data_kind ) problems.push( 'snapshot.json : versions.data_kind différent du manifeste' );
+	if ( problems.length ) return refused( problems );
+	const simulation = snap.scenario != null;
+
+	// Ordre : d'abord l'instantané devient immuable (_commit.json), puis l'index, puis latest en dernier.
+	const c = { ...m, published_at: new Date().toISOString(), simulation };
+	await putJSON( b, `snapshots/${ id }/_commit.json`, c );
+	const f = await finaliser( b, c );
+	return json( { ok: true, snapshot_id: id, published_at: c.published_at, files: m.files.length, simulation, latest: f.latest } );
 
 }
 
@@ -408,7 +522,7 @@ async function handlePublish( request, env, parts ) {
 		const sha8 = parts[ 2 ] ?? '';
 		if ( ! SHA8_RE.test( sha8 ) ) return err( 422, 'sha8_invalide', 'Attendu 8 caractères hexadécimaux.' );
 		const committed = await b.head( `models/${ sha8 }/_commit.json` );
-		if ( parts.length === 4 && parts[ 3 ] === 'commit' && request.method === 'POST' ) return commitModel( request, b, sha8, committed );
+		if ( parts.length === 4 && parts[ 3 ] === 'commit' && request.method === 'POST' ) return commitModel( request, b, sha8, committed, env );
 		if ( parts[ 3 ] === 'files' && parts.length >= 5 && request.method === 'PUT' ) return putFile( request, b, `models/${ sha8 }`, committed, parts.slice( 4 ).join( '/' ) );
 		return err( 405, 'methode', 'PUT /v1/publish/model/{sha8}/files/{path} ou POST /v1/publish/model/{sha8}/commit' );
 
@@ -418,7 +532,7 @@ async function handlePublish( request, env, parts ) {
 	const id = parts[ 1 ] ?? '';
 	if ( ! ID_RE.test( id ) ) return err( 422, 'id_invalide', 'snapshot_id = <stem>[_<scénario>]_<sha8>' );
 	const committed = await b.head( `snapshots/${ id }/_commit.json` );
-	if ( parts.length === 3 && parts[ 2 ] === 'commit' && request.method === 'POST' ) return commitSnapshot( request, b, id, committed );
+	if ( parts.length === 3 && parts[ 2 ] === 'commit' && request.method === 'POST' ) return commitSnapshot( request, b, id, committed, env );
 	if ( parts[ 2 ] === 'files' && parts.length >= 4 && request.method === 'PUT' ) return putFile( request, b, `snapshots/${ id }`, committed, parts.slice( 3 ).join( '/' ) );
 	return err( 405, 'methode', 'PUT /v1/publish/{id}/files/{path} ou POST /v1/publish/{id}/commit' );
 
@@ -436,7 +550,8 @@ export async function handleV1( request, env, url ) {
 
 	} catch ( e ) {
 
-		return err( 500, 'erreur_interne', String( e?.message ?? e ) );
+		if ( e instanceof URIError ) return err( 400, 'chemin_invalide', 'Encodage d’URL invalide.' );
+		return erreurInterne( e );
 
 	}
 
