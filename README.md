@@ -31,7 +31,11 @@ navigateur → atom.zelqane.com (ce Worker : front statique dist/ + injection cl
   **profil vertical au clic calculé par le front** depuis UNE requête `/v1/column/{id}?i&j` (direction météo,
   intervalle à 80 % = `speed ± 1,2816·sigma_speed` borné à 0, statut mesuré / estimé), capteur visible le plus
   proche (treillis `c<i>_<j>` à 50 m ou stations ANEO), géoréférencement (plan tangent, `rotation_deg`).
-- `web/src/scene/` — scène three.js (portage de l'ancienne viz) et crochet de test `window.__atom`.
+- `web/src/scene/` — scène three.js (lot F2) : relief du modèle ombré (`/v1/terrain/{sha8}`) avec exagération ×1 à ×10,
+  socle, nord, échelle ; lignes de courant colorées ; coupes horizontale et verticale ; capteurs et éoliennes ;
+  plan par défaut à **120 m au-dessus du sol**, calculé par colonne avec le relief (`domain/hauteurSol.ts`, D6), mode
+  altitude mer en option ; coloration vitesse / incertitude / fiabilité et légende chiffrée ; frise `/v1/times` et
+  rejeu ; carte de situation (`geo/tunisia.ts`). Crochet de test `window.__atom`.
 - `web/src/ui/`, `web/src/pages/` — coquille React (barre, navigation, bandeau) et pages.
 - Repère : x = Est (u), z = -Nord (v), y = altitude (w). Nœud (i, j) en `x0 + i·dx`, `y0 + j·dy` ; un nœud
   existe ssi `z − relief ≥ grid.min_agl_m`. Niveaux au-dessus du niveau de la mer, adressés par **indice**
@@ -40,7 +44,7 @@ navigateur → atom.zelqane.com (ce Worker : front statique dist/ + injection cl
   supérieure ; valeurs `null` des blocs pas encore livrés (`kpi`, `physics`…) affichées « non disponible ».
 - Bandeau « Dernier état réel calculé le … » affiché si et seulement si `compute_status != "online"`.
 
-Crochet de test (Playwright) : `window.__atom = { ready, scene, setAltitude(m), pick(x, y) }`, documenté
+Crochet de test (Playwright) : `window.__atom = { ready, scene, setAltitude(m mer), setHauteurSol(m sol), pick(x, y), orbit(deg), regler(r), etat() }`, documenté
 dans `web/src/types/atom-hook.d.ts`. `ready` est résolue au premier rendu d'un champ et **rejetée** avec un
 message si les données ne se chargent pas en 15 s ; `pick` prend des pixels CSS relatifs au canevas.
 
