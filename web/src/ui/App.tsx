@@ -3,9 +3,9 @@
 import { useLatest, type EtatLatest } from './useLatest';
 import { ROUTES, naviguer, useRoute, type PageId } from './routes';
 import { texteBandeau } from '../domain/freshness';
-import { EnConstruction } from '../pages/EnConstruction';
 import { Exploration } from '../pages/Exploration';
 import { Alertes, Eolien } from '../pages/F4';
+import { PageFiabilite, PageModele, VueEnsemble } from '../pages/F3';
 import type { JSX } from 'react';
 
 function Pastille( { s }: { s: EtatLatest } ) {
@@ -54,12 +54,12 @@ export function App() {
 	const latest = useLatest();
 
 	const pages: Record<PageId, () => JSX.Element> = {
-		ensemble: () => <EnConstruction titre="Vue d'ensemble" />,
+		ensemble: () => <VueEnsemble latest={ latest } />,
 		exploration: () => <Exploration latest={ latest } />,
-		fiabilite: () => <EnConstruction titre="Fiabilité" />,
+		fiabilite: () => <PageFiabilite latest={ latest } />,
 		eolien: () => <Eolien latest={ latest } />,
 		alertes: () => <Alertes latest={ latest } />,
-		modele: () => <EnConstruction titre="Modèle" />,
+		modele: () => <PageModele latest={ latest } />,
 	};
 
 	return (
