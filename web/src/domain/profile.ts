@@ -5,10 +5,11 @@
 //   - intervalle à 80 % : p50 = speed, p10 = max(0, speed − 1,2816·sigma_speed),
 //     p90 = speed + 1,2816·sigma_speed ; tout null si sigma_speed est inconnu ;
 //   - statut : 1 → « mesure », 0 → « estime ».
-// La classe de fiabilité n'est pas recalculée (seuils non publiés, D4) : elle vaut null.
+//   - classe de fiabilité : seuils des instantanés publiés (domain/fiabilite.ts), null si reliability est inconnue.
 
 import type { Column, ColumnLevel, ProfileLevel } from '../data/contract';
 import { dirFrom } from './wind';
+import { classeFiabilite } from './fiabilite';
 
 /** Quantile 0,9 de la loi normale : ±Z80·σ encadre 80 % des valeurs. */
 export const Z80 = 1.2816;
@@ -57,7 +58,7 @@ export function niveauDepuisColonne( l: ColumnLevel ): ProfileLevel {
 		status: l.status === 1 ? 'mesure' : l.status === 0 ? 'estime' : null,
 		coverage: l.coverage,
 		reliability: l.reliability,
-		reliability_class: null,
+		reliability_class: classeFiabilite( l.reliability ),
 	};
 
 }
