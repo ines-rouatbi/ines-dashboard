@@ -1,0 +1,56 @@
+{
+  "nom": "Relief réel du domaine ATOM-AI (ancrage SUPPOSÉ)",
+  "ancrage": {
+    "lat0": 36,
+    "lon0": 9.7,
+    "rotation_deg": 0,
+    "coin": "sud-ouest",
+    "suppose": true,
+    "avertissement": "Position SUPPOSÉE : la position réelle du domaine n a pas été fournie (tâche 61). À afficher « position supposée »."
+  },
+  "domaine": {
+    "longueur_est_m": 50000,
+    "largeur_nord_m": 25000,
+    "coins_latlon": {
+      "so": {
+        "lat": 36,
+        "lon": 9.7
+      },
+      "se": {
+        "lat": 36,
+        "lon": 10.255186838618302
+      },
+      "no": {
+        "lat": 36.22609293323928,
+        "lon": 9.7
+      },
+      "ne": {
+        "lat": 36.22609293323928,
+        "lon": 10.255186838618302
+      }
+    }
+  },
+  "grille": {
+    "nx": 500,
+    "ny": 250,
+    "dx_m": 100,
+    "dy_m": 100,
+    "centres": "x = 50 … 49 950 m ; y = 50 … 24 950 m (centres de maille)"
+  },
+  "fichier": "domaine-relief-reel.f32",
+  "format": "Float32 little-endian, ny×nx = 250×500, [j][i], j=0 au sud, i=0 à l ouest",
+  "unite": "m au-dessus du niveau de la mer",
+  "min_m": 34.5,
+  "max_m": 974.5,
+  "moyenne_m": 258.6,
+  "mailles_sous_0m": 0,
+  "methode": "Plan tangent local au coin sud-ouest : lat = lat0 + n/110574 ; lon = lon0 + e/(111320·cos(lat0)), avec (e, n) = rotation de (x, y) de rotation_deg (sens antihoraire depuis l est) ; échantillonnage bilinéaire des tuiles Terrarium au zoom 12 (~31 m à 36° N) au centre de chaque maille de 100 m.",
+  "source": {
+    "nom": "Terrain Tiles (AWS Open Data, bucket elevation-tiles-prod), format Terrarium PNG",
+    "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",
+    "attribution": "Terrain Tiles, AWS Open Data — sources SRTM, GMTED, ETOPO1 ; Mapzen",
+    "zoom": 12
+  },
+  "date_extraction": "2026-10-14",
+  "outil": "tools/geo/build-tunisia.mjs"
+}
