@@ -1,7 +1,7 @@
 // Tests fonctionnels headless (projet « headless ») : npm test.
 // Fumée sur l'existant ; les scénarios sur les 3 instantanés de test du contrat arrivent avec contract/ (16/10).
 import { test, expect } from '@playwright/test';
-import { assertIsAtom, sceneBox } from '../../lib/atom';
+import { assertIsAtom, sceneBox, SCENE_PATH } from '../../lib/atom';
 
 test( 'la page servie est le tableau de bord ATOM, sans erreur JavaScript', async ( { page } ) => {
 
@@ -9,7 +9,7 @@ test( 'la page servie est le tableau de bord ATOM, sans erreur JavaScript', asyn
 	page.on( 'pageerror', ( e ) => errors.push( e.message ) );
 	page.on( 'console', ( m ) => { if ( m.type() === 'error' ) errors.push( m.text() ); } );
 
-	const res = await page.goto( '/' );
+	const res = await page.goto( SCENE_PATH );
 	expect( res?.status() ).toBe( 200 );
 	await assertIsAtom( page );
 	await sceneBox( page );
@@ -21,7 +21,7 @@ test( 'la page servie est le tableau de bord ATOM, sans erreur JavaScript', asyn
 
 test( 'la scène 3D a un contexte WebGL', async ( { page } ) => {
 
-	await page.goto( '/' );
+	await page.goto( SCENE_PATH );
 	await assertIsAtom( page );
 	await sceneBox( page );
 	const hasGl = await page.evaluate( () => {
@@ -45,12 +45,4 @@ test( 'GPU éteint : /api répond 503 service_asleep en JSON, jamais une page d�
 
 } );
 
-for ( const snap of [ 'normal', 'capteur_en_derive', 'gpu_eteint' ] ) {
-
-	test( `instantané de test « ${ snap } » affiché fidèlement`, async () => {
-
-		test.fixme( true, 'en attente de contract/ (lot F0, figé le 16/10) : instantanés de test absents' );
-
-	} );
-
-}
+// Les 3 instantanés de test sont couverts par scene-f2.spec.ts (critères V3D1 à V3D8).

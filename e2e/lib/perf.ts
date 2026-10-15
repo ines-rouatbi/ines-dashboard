@@ -188,7 +188,10 @@ export async function measureAltitude( page: Page, levels: number[], rounds = 5 
 			samples.push( await page.evaluate( async ( alt ) => {
 
 				const t0 = performance.now();
-				await window.__atom!.setAltitude( alt );
+				// Les hauteurs du banc sont AU-DESSUS DU SOL : setHauteurSol (F2) ; setAltitude attend une
+				// altitude MER et ne sert qu'en repli (page sans mode sol).
+				if ( typeof window.__atom!.setHauteurSol === 'function' ) await window.__atom!.setHauteurSol( alt );
+				else await window.__atom!.setAltitude( alt );
 				// Si setAltitude ne garantit pas la frame peinte, cette attente la garantit (surcoût ≤ 1 frame).
 				await new Promise( ( r ) => requestAnimationFrame( () => requestAnimationFrame( r ) ) );
 				return performance.now() - t0;
@@ -199,7 +202,8 @@ export async function measureAltitude( page: Page, levels: number[], rounds = 5 
 
 	}
 
-	return summarize( samples, `window.__atom.setAltitude(m) + double rAF, niveaux ${ levels.join( ', ' ) } m, ${ rounds } tours`, 0 );
+	const api = await page.evaluate( () => typeof window.__atom?.setHauteurSol === 'function' ? 'setHauteurSol (m au-dessus du sol)' : 'setAltitude (m au-dessus de la mer, repli)' );
+	return summarize( samples, `window.__atom.${ api } + double rAF, hauteurs ${ levels.join( ', ' ) } m, ${ rounds } tours`, 0 );
 
 }
 

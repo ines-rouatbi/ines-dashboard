@@ -8,12 +8,13 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assertIsAtom, waitForAtom, requireAtom, type AtomState } from '../../lib/atom';
+import { assertIsAtom, waitForAtom, requireAtom, SCENE_PATH, type AtomState } from '../../lib/atom';
 import { measureFps, measureClickFeedback, measurePick, measureAltitude, measureFirstRender, installReadyProbe, jsMemory, gpuInfo } from '../../lib/perf';
 import { PerfReport } from '../../lib/report';
 
 const REPORTS = path.resolve( path.dirname( fileURLToPath( import.meta.url ) ), '../../reports' );
 const FPS_MS = Number( process.env.ATOM_FPS_MS ?? 10_000 );
+// Hauteurs AU-DESSUS DU SOL (passées à setHauteurSol, mode sol de F2 ; jamais à setAltitude qui attend la mer).
 const ALTITUDES = ( process.env.ATOM_ALTITUDES ?? '10,100,300,1000' ).split( ',' ).map( Number );
 // Visionneuse historique seulement (pas de pick) : panneau observé pour dater le retour visuel.
 const LEGACY_FEEDBACK = process.env.ATOM_FEEDBACK ?? '#profile-card';
@@ -41,7 +42,7 @@ test.afterAll( async () => {
 async function open( page: import( '@playwright/test' ).Page ): Promise<AtomState> {
 
 	await installReadyProbe( page );
-	await page.goto( '/' );
+	await page.goto( SCENE_PATH );
 	await assertIsAtom( page );
 	const state = await waitForAtom( page );
 	requireAtom( state );

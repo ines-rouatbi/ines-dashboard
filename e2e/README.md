@@ -33,7 +33,7 @@ Le drapeau `--use-angle` vaut `d3d11` sous Windows, `metal` sous macOS, `gl` ail
 | Projet | Dossier | Rôle |
 |---|---|---|
 | `oracles` | `oracles/` | Direction météo, champs Float32 LE `[j][i]` avec NaN sous le relief, hauteur sol / mer, REWS, cisaillement, courbe de puissance, Weibull, rose des vents. Ces calculs ne servent **qu'à vérifier** ce que renvoie l'API : décision D4, ils restent en Python. |
-| `headless` | `tests/functional/` | Fumée : bonne page, pas d'erreur JS, WebGL, `/api` en `503 service_asleep` quand le GPU dort. Les tests des 3 instantanés de test sont marqués `fixme` jusqu'à `contract/`. |
+| `headless` | `tests/functional/` | Fumée : bonne page, pas d'erreur JS, WebGL, `/api` en `503 service_asleep` quand le GPU dort. `scene-f2.spec.ts` : critères V3D1 à V3D8 de la scène 3D sur les 3 instantanés de test (`?scenario=`). |
 | `headed-gpu` | `tests/perf/` | FPS (5e centile sur 10 s de rotation caméra), clic → retour visuel (p95), changement d'altitude (p95), premier rendu, mémoire JS. Un seul Chrome à la fois. |
 
 ## Variables
@@ -49,7 +49,8 @@ Le drapeau `--use-angle` vaut `d3d11` sous Windows, `metal` sous macOS, `gl` ail
 | `ATOM_ANGLE` | selon l'OS | Moteur ANGLE de Chrome (`d3d11`, `metal`, `vulkan`, `gl`). |
 | `ATOM_GPU` | GPU intégré | `haute-perf` force le GPU dédié (`--force_high_performance_gpu`). |
 | `ATOM_FPS_MS` | `10000` | Durée de la mesure de FPS. |
-| `ATOM_ALTITUDES` | `10,100,300,1000` | Hauteurs (m) alternées pour la mesure de changement d'altitude. |
+| `ATOM_ALTITUDES` | `10,100,300,1000` | Hauteurs (m) **au-dessus du sol** alternées pour la mesure de changement d'altitude, passées à `setHauteurSol` (mode sol de F2, calcul par colonne avec le relief). `setAltitude` attend une altitude **mer** et ne sert qu'en repli. |
+| `ATOM_SCENE_PATH` | `/exploration` | Page de la scène 3D ouverte par la fumée, le banc et `scene-f2.spec.ts`. |
 | `ATOM_FEEDBACK` | `#profile-card` | Visionneuse historique seulement : panneau observé pour dater le retour du clic. Avec `window.__atom`, le clic est mesuré par `pick()` + double rAF, sans observer le DOM. |
 | `ATOM_EXPECT_TITLE` | `PC-FNO3D\|ATOM` | Garde-fou : titre attendu de la page. |
 
@@ -75,7 +76,9 @@ window.__atom = {
   ready: Promise,              // résolue après le premier rendu PEINT ; rejetée si /v1/meta, /v1/latest
                                // ou le premier champ manquent (sinon au bout de 15 s) → métriques non_mesure
   scene,
-  setAltitude(m): Promise,     // résolue après la frame peinte du nouveau niveau
+  setAltitude(m): Promise,     // m AU-DESSUS DE LA MER (niveau publié le plus proche) ; résolue après la frame peinte
+  setHauteurSol(m): Promise,   // F2 : m AU-DESSUS DU SOL (par colonne, relief du modèle) ; défaut de la page : 120 m
+  regler(r), etat(),           // F2 : réglages (coloration, coupes, couches, instantané…) et état observable
   pick(x, y): Promise,         // pixels CSS relatifs au canvas ; { i, j, x_m, y_m } ou null hors domaine
   orbit?(deg): Promise,        // facultatif ; sinon le banc fait tourner la caméra à la souris
 }
