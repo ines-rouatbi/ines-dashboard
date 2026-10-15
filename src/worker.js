@@ -1,7 +1,7 @@
 // Worker atom.zelqane.com — façade de PC-FNO3D.
 //
 // Rôles :
-//   1. Servir la viz three.js (assets statiques dans ./public) à la racine.
+//   1. Servir le front (build Vite statique dans ./dist) à la racine.
 //   2. Proxifier /api/* et /mcp* vers le tunnel (ORIGIN = atom-origin.zelqane.com),
 //      en INJECTANT la clé d'API lecture-seule côté serveur (X-API-Key) : le navigateur
 //      ne porte jamais la clé.
@@ -118,7 +118,7 @@ export default {
 
 		}
 
-		// Tout le reste : la viz statique (SPA fallback géré par not_found_handling).
+		// Tout le reste : le front statique (repli SPA géré par not_found_handling).
 		return env.ASSETS.fetch( request );
 
 	},

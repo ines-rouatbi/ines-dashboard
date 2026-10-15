@@ -1,15 +1,15 @@
 {
   // Worker « atom.zelqane.com » — façade de PC-FNO3D (service vent 3D d'ines sur Colab).
-  // Il sert la viz three.js (statique), INJECTE la clé d'API lecture-seule côté serveur
+  // Il sert le front (Vite + React, build statique dans ./dist), INJECTE la clé d'API lecture-seule côté serveur
   // (le navigateur ne la voit jamais), et proxifie /api + /mcp vers le tunnel (atom-origin).
   "name": "atom-zelqane",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-20",
 
-  // La viz est servie depuis ./public. run_worker_first:true => le Worker décide pour CHAQUE
+  // Le front est servi depuis ./dist (npm run build). run_worker_first:true => le Worker décide pour CHAQUE
   // requête (api/mcp -> proxy ; reste -> assets), sinon les assets court-circuiteraient /api.
   "assets": {
-    "directory": "./public",
+    "directory": "./dist",
     "binding": "ASSETS",
     "run_worker_first": true,
     "not_found_handling": "single-page-application"

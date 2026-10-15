@@ -1,0 +1,177 @@
+/* Charte ATOM-AI (cahier des charges §17.4) : encre #12263A, fond #E9EEF1, panneaux
+   blancs, accent #1E6FB8, sable #B8925A (relief), police Inter, chiffres tabulaires. */
+
+:root {
+	--encre: #12263A;
+	--encre-2: #3C5266;
+	--encre-3: #6B7D8D;
+	--fond: #E9EEF1;
+	--panneau: #FFFFFF;
+	--accent: #1E6FB8;
+	--sable: #B8925A;
+	--trait: #D5DDE3;
+	--ok: #2E8B57;
+	--alerte: #C0392B;
+	--attente: #6B7D8D;
+	--rayon: 10px;
+	--ombre: 0 1px 2px rgba(18, 38, 58, .06), 0 4px 16px rgba(18, 38, 58, .06);
+	font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	color: var(--encre);
+	background: var(--fond);
+	font-size: 14px;
+	-webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; }
+body { background: var(--fond); color: var(--encre); }
+
+.num { font-variant-numeric: tabular-nums; }
+.muet { color: var(--encre-3); }
+.petit { font-size: 12px; }
+
+.app { display: flex; flex-direction: column; height: 100%; }
+
+/* ---- Barre supérieure ---- */
+.topbar {
+	display: flex;
+	align-items: center;
+	gap: 20px;
+	padding: 0 20px;
+	height: 56px;
+	flex: none;
+	background: var(--encre);
+	color: #fff;
+}
+.marque { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.logo {
+	width: 22px; height: 22px; border-radius: 6px;
+	background: linear-gradient(135deg, var(--accent), var(--sable));
+}
+.titre { font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+.titre .sep { color: rgba(255, 255, 255, .5); margin: 0 2px; }
+
+.nav { display: flex; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.nav a {
+	color: rgba(255, 255, 255, .72);
+	text-decoration: none;
+	font-weight: 500;
+	padding: 8px 12px;
+	border-radius: 7px;
+	white-space: nowrap;
+}
+.nav a:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.nav a.actif { color: #fff; background: var(--accent); }
+
+.pill {
+	display: inline-flex; align-items: center;
+	font-size: 12px; font-weight: 600;
+	padding: 5px 11px; border-radius: 999px;
+	background: rgba(255, 255, 255, .1);
+	border: 1px solid rgba(255, 255, 255, .2);
+	white-space: nowrap;
+}
+.pill-live { color: #7EE2A8; border-color: rgba(126, 226, 168, .45); }
+.pill-down { color: #FFB4A8; border-color: rgba(255, 180, 168, .45); }
+.pill-wait { color: rgba(255, 255, 255, .7); }
+
+/* ---- Bandeau de fraîcheur ---- */
+.bandeau {
+	flex: none;
+	padding: 9px 20px;
+	background: #FBF3E6;
+	border-bottom: 1px solid #E6D3B3;
+	color: #6A4E22;
+	font-weight: 500;
+}
+
+/* ---- Pages ---- */
+.page { flex: 1; min-height: 0; overflow: auto; }
+.page-vide { padding: 32px 24px; }
+.page-vide h1 { margin: 0 0 6px; font-size: 22px; }
+
+/* ---- Exploration 3D ---- */
+.exploration {
+	display: grid;
+	grid-template-columns: 280px 1fr 340px;
+	gap: 12px;
+	padding: 12px;
+	height: 100%;
+	min-height: 520px;
+}
+.panneau {
+	background: var(--panneau);
+	border-radius: var(--rayon);
+	box-shadow: var(--ombre);
+	padding: 16px;
+	overflow-y: auto;
+	min-height: 0;
+}
+.panneau h2 { margin: 0 0 14px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--encre-2); }
+
+.scene {
+	position: relative;
+	border-radius: var(--rayon);
+	overflow: hidden;
+	/* Le rendu three.js porté tel quel est sombre : il est posé sur l'encre de la charte. */
+	background: radial-gradient(1200px 700px at 70% -10%, rgba(30, 111, 184, .18), transparent 60%), var(--encre);
+	min-height: 0;
+}
+.scene canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.scene-message {
+	position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+	color: rgba(255, 255, 255, .85);
+	background: rgba(18, 38, 58, .8);
+	padding: 10px 16px; border-radius: 8px;
+	max-width: 80%; text-align: center;
+}
+
+.champ { display: block; margin-bottom: 18px; }
+.champ > span { display: block; margin-bottom: 7px; color: var(--encre-2); }
+.champ b { color: var(--encre); font-weight: 600; }
+.champ.en-ligne { display: flex; align-items: center; gap: 9px; }
+.champ.en-ligne span { margin: 0; color: var(--encre); }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+.graduations { display: flex; justify-content: space-between; font-size: 11px; color: var(--encre-3); margin-top: 2px; }
+
+.legende { margin: 6px 0 16px; }
+.legende-titre { font-size: 12px; color: var(--encre-2); margin-bottom: 6px; }
+.legende-barre { height: 12px; border-radius: 6px; border: 1px solid var(--trait); }
+.legende-echelle { display: flex; justify-content: space-between; font-size: 11px; color: var(--encre-3); margin-top: 4px; }
+.astuce { font-size: 12px; color: var(--encre-3); line-height: 1.5; margin: 0; }
+
+.carte { border: 1px solid var(--trait); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+.carte h3 { margin: 0 0 9px; font-size: 13px; }
+.carte p { margin: 4px 0 0; }
+.grille-cles { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 13px; }
+.grille-cles dt { color: var(--encre-3); }
+.grille-cles dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.stats b { display: block; font-size: 18px; }
+.stats span { font-size: 11px; color: var(--encre-3); text-transform: uppercase; letter-spacing: .4px; }
+.stats p { grid-column: 1 / 4; }
+.graphe-profil { width: 100%; height: 240px; }
+
+@media (max-width: 1100px) {
+	.exploration { grid-template-columns: 1fr; height: auto; }
+	.scene { height: 60vh; min-height: 360px; }
+	.topbar { gap: 12px; padding: 0 12px; }
+}
+
+/* ---- Tableau du profil vertical ---- */
+.panneau.tableau { overflow-x: hidden; }
+.tableau-profil { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+.tableau-profil th { text-align: right; font-weight: 600; color: var(--encre-2); border-bottom: 1px solid var(--trait); padding: 3px 4px; }
+.tableau-profil td { text-align: right; padding: 3px 3px; border-bottom: 1px solid #F0F3F5; }
+.tableau-profil tr.sous-relief td { color: var(--sable); }
+
+/* ---- Badge de nature des données (versions.data_kind) ---- */
+.badge-nature {
+	font-size: 12px; font-weight: 600; white-space: nowrap;
+	padding: 5px 10px; border-radius: 6px;
+	border: 1px solid rgba(255, 255, 255, .25); color: #fff;
+}
+.badge-nature.nature-test { background: var(--sable); border-color: var(--sable); color: var(--encre); }
+.badge-nature.nature-synthetique { background: rgba(184, 146, 90, .25); border-color: var(--sable); }
+.badge-nature.nature-reel { background: var(--accent); border-color: var(--accent); }
