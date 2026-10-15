@@ -1,0 +1,182 @@
+{
+  "versions": {
+    "model": "fixture-test",
+    "model_sha256": "e44d68da25fe37103bcbc40f354411b81635a698e87e8eee1ffafac8f6e68348",
+    "norm": "70b219b3",
+    "data": "synthetique_contrat_v1",
+    "data_kind": "test",
+    "contract": "1.0"
+  },
+  "grid": {
+    "nx": 100,
+    "ny": 50,
+    "nz": 12,
+    "dx_m": 500,
+    "dy_m": 500,
+    "x0_m": 0,
+    "y0_m": 0,
+    "min_agl_m": 5,
+    "levels_asl_m": [
+      25,
+      50,
+      75,
+      100,
+      150,
+      200,
+      300,
+      400,
+      500,
+      650,
+      800,
+      1000
+    ],
+    "order": "zyx_sud_ouest",
+    "valid_nodes": 45925,
+    "valid_fraction_by_level": [
+      0.3354,
+      0.5396,
+      0.6096,
+      0.6534,
+      0.7118,
+      0.7572,
+      0.81,
+      0.858,
+      0.91,
+      1,
+      1,
+      1
+    ]
+  },
+  "domain": {
+    "x_max_m": 49500,
+    "y_max_m": 24500,
+    "origin": "noeud_0_0_sud_ouest",
+    "crs": "plan-tangent-local"
+  },
+  "georef": {
+    "lat0": 36,
+    "lon0": 9.7,
+    "rotation_deg": 0,
+    "projection": "equirectangulaire_tangent_noeud_0_0",
+    "m_per_deg_lat": 110574,
+    "m_per_deg_lon": 90059.772,
+    "bounds": {
+      "lat_min": 36,
+      "lat_max": 36.221571,
+      "lon_min": 9.7,
+      "lon_max": 10.249635
+    },
+    "suppose": true
+  },
+  "terrain": {
+    "min_m": 19,
+    "max_m": 579.01,
+    "href": "/v1/terrain/e44d68da",
+    "sha256": "c8f566c2bc534b2431637814598b7bd74e81f45ee46053a5ed074a2213f1f176",
+    "bytes": 20000,
+    "source": "instantané de test synthétique (contract/tools/make-fixtures.mjs)"
+  },
+  "fields": [
+    "u",
+    "v",
+    "w",
+    "speed",
+    "sigma_speed",
+    "sigma_u",
+    "sigma_v",
+    "sigma_w",
+    "coverage",
+    "reliability",
+    "status"
+  ],
+  "encoding": {
+    "u": {
+      "dtype": "float32",
+      "file": "fields/u.f32",
+      "nodata": "NaN",
+      "scale": null
+    },
+    "v": {
+      "dtype": "float32",
+      "file": "fields/v.f32",
+      "nodata": "NaN",
+      "scale": null
+    },
+    "w": {
+      "dtype": "float32",
+      "file": "fields/w.f32",
+      "nodata": "NaN",
+      "scale": null
+    },
+    "speed": {
+      "dtype": "float32",
+      "file": "fields/speed.f32",
+      "nodata": "NaN",
+      "scale": null
+    },
+    "sigma_speed": {
+      "dtype": "float32",
+      "file": "fields/sigma_speed.f32",
+      "nodata": "NaN",
+      "scale": null
+    },
+    "sigma_u": {
+      "dtype": "float32",
+      "file": "fields/sigma_u.f32",
+      "nodata": "NaN",
+      "scale": null
+    },
+    "sigma_v": {
+      "dtype": "float32",
+      "file": "fields/sigma_v.f32",
+      "nodata": "NaN",
+      "scale": null
+    },
+    "sigma_w": {
+      "dtype": "float32",
+      "file": "fields/sigma_w.f32",
+      "nodata": "NaN",
+      "scale": null
+    },
+    "coverage": {
+      "dtype": "uint8",
+      "file": "fields/coverage.u8",
+      "nodata": 255,
+      "scale": 0.003937007874015748
+    },
+    "reliability": {
+      "dtype": "uint8",
+      "file": "fields/reliability.u8",
+      "nodata": 255,
+      "scale": 0.003937007874015748
+    },
+    "status": {
+      "dtype": "uint8",
+      "file": "fields/status.u8",
+      "nodata": 255,
+      "scale": 1
+    }
+  },
+  "units": {
+    "u": "m/s",
+    "v": "m/s",
+    "w": "m/s",
+    "speed": "m/s",
+    "sigma_speed": "m/s",
+    "sigma_u": "m/s",
+    "sigma_v": "m/s",
+    "sigma_w": "m/s",
+    "coverage": "0-1",
+    "reliability": "0-1",
+    "status": "1 mesuré / 0 estimé",
+    "altitude": "m au-dessus de la mer"
+  },
+  "conventions": {
+    "u": "positif_est",
+    "v": "positif_nord",
+    "w": "positif_haut",
+    "direction": "meteo_provenance",
+    "altitude": "asl",
+    "nodata": "null_json_nan_f32_255_u8"
+  }
+}

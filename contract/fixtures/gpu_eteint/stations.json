@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id": "c880_420",
+      "x_m": 44000,
+      "y_m": 21000,
+      "height_agl_m": 25,
+      "state": "muette",
+      "last_seen": "2025-01-12T09:40:00Z",
+      "speed": null,
+      "dir_from_deg": null,
+      "bias_ms": null,
+      "quality_score": 0
+    }
+  ]
+}

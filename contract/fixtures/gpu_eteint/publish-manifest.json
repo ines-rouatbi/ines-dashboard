@@ -1,0 +1,132 @@
+{
+  "snapshot_id": "test_gpu_eteint_e44d68da",
+  "valid_time": "2025-01-12T12:00:00Z",
+  "generated_at": "2025-01-12T12:00:02Z",
+  "last_observation_at": "2025-01-12T11:59:40Z",
+  "data_status": "degrade",
+  "versions": {
+    "model": "fixture-test",
+    "model_sha256": "e44d68da25fe37103bcbc40f354411b81635a698e87e8eee1ffafac8f6e68348",
+    "norm": "70b219b3",
+    "data": "synthetique_contrat_v1",
+    "data_kind": "test",
+    "contract": "1.0"
+  },
+  "files": [
+    {
+      "path": "fields/u.f32",
+      "sha256": "f2c82b33012626c461acc9d774f5046cbf638d0afdf1c954fd7bc987792c1e1e",
+      "bytes": 240000
+    },
+    {
+      "path": "fields/v.f32",
+      "sha256": "0541bf3b78aba4445b16c48368c6f7d8a4dbf1e428a8deac0ee93abcb8b34197",
+      "bytes": 240000
+    },
+    {
+      "path": "fields/w.f32",
+      "sha256": "17873d0e8bce42ebb998bef2362df9747798c1fb9279f8d6a05e00c27bf52d06",
+      "bytes": 240000
+    },
+    {
+      "path": "fields/speed.f32",
+      "sha256": "6e0e4d8743497561b9bc6f4ab42a05d0171a412090700ad90187ba2425fbf32f",
+      "bytes": 240000
+    },
+    {
+      "path": "fields/sigma_speed.f32",
+      "sha256": "c7a22867f92ebe832a404eb74759f356aad0b4eb285ed554601c1bd4550a755a",
+      "bytes": 240000
+    },
+    {
+      "path": "fields/sigma_u.f32",
+      "sha256": "c7a22867f92ebe832a404eb74759f356aad0b4eb285ed554601c1bd4550a755a",
+      "bytes": 240000
+    },
+    {
+      "path": "fields/sigma_v.f32",
+      "sha256": "1f821d4e0565601161cc47293db56687bc3be740e6274f7815642953a8226cc7",
+      "bytes": 240000
+    },
+    {
+      "path": "fields/sigma_w.f32",
+      "sha256": "3c34a26f4c17ad374ae051661587744ffb88fa349f66ace571b024e2653b0e3d",
+      "bytes": 240000
+    },
+    {
+      "path": "fields/coverage.u8",
+      "sha256": "1669a6d2ce83b939f11752bdea8bde504a3ef03f0108f7e1971378b716fef2bb",
+      "bytes": 60000
+    },
+    {
+      "path": "fields/reliability.u8",
+      "sha256": "dd7eb03540ab4d2ae0ca3f44d4174a4b806eb7324b336ea1724903079b18e7c5",
+      "bytes": 60000
+    },
+    {
+      "path": "fields/status.u8",
+      "sha256": "d6ec5fbc6fb949cb771df6aa2065111b042414857e947f437c8288d72b10ecff",
+      "bytes": 60000
+    },
+    {
+      "path": "stations.json",
+      "sha256": "c9fcee9d58047075800fc425c8178cbe66ad38fb8cb7c990d67023d77e45a54f",
+      "bytes": 288
+    },
+    {
+      "path": "alerts.json",
+      "sha256": "057393f977b3b958456a175c73d167b6a2ceda1088c197efc227a505ed230d8a",
+      "bytes": 1702
+    },
+    {
+      "path": "wind-farm.json",
+      "sha256": "9c2b286d2f6a7a00adaad7047e0ecf8756dc985e442c8fab75108197a7caa702",
+      "bytes": 2763
+    },
+    {
+      "path": "profiles/T-01.json",
+      "sha256": "bf1467c2838f81a66f44bdbf2df96066608e32bd61e7c4f69f4387e45dfb02ed",
+      "bytes": 5648
+    },
+    {
+      "path": "profiles/T-02.json",
+      "sha256": "03030d34e91b41ca7afce2fc0b8eb2ae1056a3bdbdcea11b689727e1e0a6c548",
+      "bytes": 5582
+    },
+    {
+      "path": "profiles/T-03.json",
+      "sha256": "45b890a848e72d2a0ec9f98a3fe92ee90b4117843f5f75e4fe093040b9d7a0d2",
+      "bytes": 5463
+    },
+    {
+      "path": "profiles/S-01.json",
+      "sha256": "65a5632735c00599ea76755b8a91914559a68624a343462babd557f242bc4811",
+      "bytes": 5600
+    },
+    {
+      "path": "windrose/T-01.json",
+      "sha256": "d1009d49f68ae5e7eb16a13179f46d0ed18943cdde1a8858235b1dcaa3007ee7",
+      "bytes": 2366
+    },
+    {
+      "path": "windrose/S-01.json",
+      "sha256": "7dfd7f02f4ff76549cde6fbc9325cfda4d2efa892a004f3c89eb3d6f0b29786e",
+      "bytes": 2371
+    },
+    {
+      "path": "quality.json",
+      "sha256": "aa2c1c1cde516eb792b52f4b79a34ec2d34aa334704741ce2eb8c088526eb679",
+      "bytes": 2925
+    },
+    {
+      "path": "data-quality.json",
+      "sha256": "0647a097414ad6384bd7061ee06243e79f8b039612240859d7ca11dfe7fa70c1",
+      "bytes": 668
+    },
+    {
+      "path": "snapshot.json",
+      "sha256": "f4ea3ec3f3fa4765682774e5bf48ee4b7a9790d230e233b6d31b4f6354e7e414",
+      "bytes": 2414
+    }
+  ]
+}

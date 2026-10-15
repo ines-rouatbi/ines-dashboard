@@ -1,0 +1,147 @@
+{
+  "turbines": [
+    {
+      "id": "T-01",
+      "name": "Éolienne virtuelle 1",
+      "x_m": 12000,
+      "y_m": 8000,
+      "virtual": true,
+      "model": "generique-2MW",
+      "hub_agl_m": 120,
+      "rotor_d_m": 90,
+      "rated_kw": 2000,
+      "cut_in_ms": 3,
+      "cut_out_ms": 25,
+      "hub_speed": {
+        "p10": 10.05,
+        "p50": 10.5,
+        "p90": 10.95
+      },
+      "rews": {
+        "p10": 10.03,
+        "p50": 10.48,
+        "p90": 10.93
+      },
+      "shear_alpha": 0.12,
+      "veer_deg": 2.25,
+      "power_kw": {
+        "p10": 1529,
+        "p50": 1664,
+        "p90": 1797
+      },
+      "state": "production",
+      "air_density": 1.225,
+      "air_density_source": "atmosphere_standard"
+    },
+    {
+      "id": "T-02",
+      "name": "Éolienne virtuelle 2",
+      "x_m": 14500,
+      "y_m": 9500,
+      "virtual": true,
+      "model": "generique-2MW",
+      "hub_agl_m": 120,
+      "rotor_d_m": 90,
+      "rated_kw": 2000,
+      "cut_in_ms": 3,
+      "cut_out_ms": 25,
+      "hub_speed": {
+        "p10": 10.14,
+        "p50": 10.59,
+        "p90": 11.04
+      },
+      "rews": {
+        "p10": 10.12,
+        "p50": 10.57,
+        "p90": 11.02
+      },
+      "shear_alpha": 0.116,
+      "veer_deg": 2.25,
+      "power_kw": {
+        "p10": 1557,
+        "p50": 1691,
+        "p90": 1822
+      },
+      "state": "production",
+      "air_density": 1.225,
+      "air_density_source": "atmosphere_standard"
+    },
+    {
+      "id": "T-03",
+      "name": "Éolienne virtuelle 3",
+      "x_m": 30000,
+      "y_m": 15000,
+      "virtual": true,
+      "model": "generique-2MW",
+      "hub_agl_m": 120,
+      "rotor_d_m": 90,
+      "rated_kw": 2000,
+      "cut_in_ms": 3,
+      "cut_out_ms": 25,
+      "hub_speed": {
+        "p10": 11.49,
+        "p50": 11.94,
+        "p90": 12.39
+      },
+      "rews": {
+        "p10": 11.46,
+        "p50": 11.91,
+        "p90": 12.36
+      },
+      "shear_alpha": 0.068,
+      "veer_deg": 2.25,
+      "power_kw": {
+        "p10": 1904,
+        "p50": 1984,
+        "p90": 2000
+      },
+      "state": "production",
+      "air_density": 1.225,
+      "air_density_source": "atmosphere_standard"
+    }
+  ],
+  "farm": {
+    "power_kw": {
+      "p10": 4989,
+      "p50": 5339,
+      "p90": 5619
+    },
+    "rated_kw": 6000,
+    "n_production": 3,
+    "n_arret": 0
+  },
+  "power_curves": {
+    "generique-2MW": {
+      "speed_ms": [
+        0,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        25,
+        25.01
+      ],
+      "power_kw": [
+        0,
+        0,
+        70,
+        180,
+        340,
+        560,
+        840,
+        1180,
+        1520,
+        1820,
+        2000,
+        2000,
+        0
+      ]
+    }
+  }
+}

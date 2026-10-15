@@ -1,0 +1,159 @@
+openapi: 3.1.0
+info:
+  title: ATOM-AI — contrat v1, révision 2 (tableau de bord atom.zelqane.com)
+  version: "1.0"
+  description: |
+    Contrat entre le service PC-FNO3D (ines-pc / Colab) et le tableau de bord (Worker Cloudflare + R2).
+    Le service PUBLIE des fichiers immuables dans R2 via /v1/publish ; le tableau de bord ne LIT que /v1/*.
+    Le Worker ne fait aucun calcul scientifique : il lit R2 (lectures partielles comprises) et applique
+    seulement les conversions définies par le contrat (NaN → null, uint8 × scale, 255 → null).
+    Conventions : u vers l'Est, v vers le Nord, w vers le haut ; direction météo = d'où vient le vent,
+    (270 − atan2(v,u)) mod 360, arrondie avant le modulo, null si vitesse < 0,2 m/s ; altitudes en m
+    AU-DESSUS DE LA MER ; nœud (i, j) en x = x0 + i·dx, y = y0 + j·dy ; nœud absent ⇔ z − relief < min_agl_m
+    (null en JSON, NaN en Float32 LE, 255 en uint8). Décisions : contract/DECISIONS-rev2.md.
+    Confidentiel — usage interne Tukhnanutha.
+servers:
+  - url: https://atom.zelqane.com
+components:
+  securitySchemes:
+    publishToken: { type: http, scheme: bearer, description: "Jeton de publication remis hors salon ; secret Colab / variable d'environnement, jamais dans git" }
+  parameters:
+    id: { name: id, in: path, required: true, schema: { type: string }, description: "snapshot_id, ou « latest » (alors Cache-Control: no-store)" }
+    sha8: { name: sha8, in: path, required: true, schema: { type: string, pattern: "^[0-9a-f]{8}$" } }
+    filePath: { name: path, in: path, required: true, schema: { type: string }, description: "Chemin relatif encodé (encodeURIComponent : « / » → %2F) ; le Worker accepte aussi les « / » bruts" }
+    sha256Header: { name: X-Content-SHA256, in: header, required: true, schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
+  headers:
+    immutable: { schema: { type: string }, description: "public, max-age=31536000, immutable (sauf id = latest : no-store)" }
+  responses:
+    notFound: { description: Inconnu, content: { application/json: { schema: { type: object, properties: { error: { type: string }, message: { type: string } } } } } }
+paths:
+  /v1/latest:
+    get:
+      summary: Dernier instantané publié ; data_status repris du manifeste ; compute_status calculé par le Worker (battement < 5 min → online)
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/latest.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/meta:
+    get:
+      summary: meta du modèle de l'instantané latest (non cachable)
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/meta.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/meta/{sha8}:
+    get:
+      summary: meta d'un modèle précis (immuable)
+      parameters: [ { $ref: "#/components/parameters/sha8" } ]
+      responses: { "200": { description: OK, headers: { Cache-Control: { $ref: "#/components/headers/immutable" } }, content: { application/json: { schema: { $ref: "schemas/meta.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/terrain/{sha8}:
+    get:
+      summary: Relief du modèle, Float32 LE ny·nx, m au-dessus de la mer, sans nodata (immuable)
+      parameters: [ { $ref: "#/components/parameters/sha8" } ]
+      responses: { "200": { description: OK, headers: { Cache-Control: { $ref: "#/components/headers/immutable" } }, content: { application/octet-stream: {} } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/times:
+    get:
+      summary: Instantanés publiés, paginés (200 par page)
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/times.schema.json" } } } } }
+  /v1/snapshots/{id}:
+    get:
+      summary: Résumé, réseau, indicateurs clés (null = non disponible), physique, points déclarés, liens des ressources
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/snapshot.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/fields/{id}/{level}/{var}:
+    get:
+      summary: Champ 2D d'un niveau (indice 0..nz-1), ny·nx valeurs, index j·nx + i
+      description: |
+        Lu par le Worker dans fields/{var}.{f32|u8} (tous niveaux) par lecture partielle R2 :
+        offset = level·ny·nx·taille, longueur = ny·nx·taille. float32 LE (NaN = absent) ou uint8 (255 = absent ;
+        valeur = octet × meta.encoding[var].scale). Le type est donné par l'en-tête x-atom-dtype.
+      parameters:
+        - { $ref: "#/components/parameters/id" }
+        - { name: level, in: path, required: true, schema: { type: integer, minimum: 0 } }
+        - { name: var, in: path, required: true, schema: { enum: [u, v, w, speed, sigma_speed, sigma_u, sigma_v, sigma_w, coverage, reliability, status] } }
+      responses:
+        "200":
+          description: OK
+          headers:
+            Cache-Control: { $ref: "#/components/headers/immutable" }
+            x-atom-dtype: { schema: { enum: [float32, uint8] } }
+          content: { application/octet-stream: {} }
+        "404": { $ref: "#/components/responses/notFound" }
+        "422": { description: Niveau ou variable invalide }
+  /v1/column/{id}:
+    get:
+      summary: Valeurs brutes de la colonne (i, j) à tous les niveaux, pour toutes les variables de meta.fields, et relief
+      description: |
+        Profil au clic en un point quelconque : le front choisit le nœud (i, j) et calcule lui-même direction et
+        intervalle avec les formules du contrat. Le Worker lit chaque valeur par lecture partielle R2, en parallèle.
+      parameters:
+        - { $ref: "#/components/parameters/id" }
+        - { name: i, in: query, required: true, schema: { type: integer, minimum: 0 } }
+        - { name: j, in: query, required: true, schema: { type: integer, minimum: 0 } }
+      responses: { "200": { description: OK, headers: { Cache-Control: { $ref: "#/components/headers/immutable" } }, content: { application/json: { schema: { $ref: "schemas/column.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" }, "422": { description: i ou j hors grille } }
+  /v1/profiles/{id}/{point_id}:
+    get:
+      summary: Profil vertical précalculé en un point déclaré (snapshot.points, profile = true) ; nœud utilisé (i, j, x_m, y_m) et intervalle speed ± 1,2816·sigma_speed
+      parameters: [ { $ref: "#/components/parameters/id" }, { name: point_id, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/profile.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/windrose/{site_id}:
+    get:
+      summary: Rose des vents et Weibull précalculées (M5, M6) pour un site ou une éolienne déclaré, période dans le fichier (n_valid obligatoire)
+      parameters:
+        - { name: site_id, in: path, required: true, schema: { type: string } }
+        - { name: snapshot, in: query, required: false, schema: { type: string }, description: "Instantané précis ; latest par défaut" }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/windrose.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/quality/{id}:
+    get:
+      summary: Fiabilité de la reconstruction par niveau, méthode d'incertitude, calibration (M2, DSO6)
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/quality.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/data-quality/{id}:
+    get:
+      summary: Qualité des données d'entrée (rapport de M3 : fichiers rejetés, quarantaine, capteurs muets, valeurs interpolées)
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/data-quality.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/alerts/{id}:
+    get:
+      summary: Alertes (4 niveaux, ouverte | close), id stable sha8(kind|cible), cause et recommandation
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/alerts.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/stations/{id}:
+    get:
+      summary: Capteurs ; liste complète en stations_aneo, capteurs signalés seulement (c<i>_<j>) en treillis_synthetique
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/stations.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/wind-farm/{id}:
+    get:
+      summary: Éoliennes (moyeu, REWS pondéré par l'aire, α, veer, puissance p10–p90, densité de l'air) et production du parc
+      parameters: [ { $ref: "#/components/parameters/id" } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "schemas/wind-farm.schema.json" } } } }, "404": { $ref: "#/components/responses/notFound" } }
+  /v1/publish/model/{sha8}/files/{path}:
+    put:
+      summary: (service GPU) Dépose un fichier par modèle (meta.json, terrain.f32). Idempotent si même sha256. 8 Mo max.
+      security: [ { publishToken: [] } ]
+      parameters: [ { $ref: "#/components/parameters/sha8" }, { $ref: "#/components/parameters/filePath" }, { $ref: "#/components/parameters/sha256Header" } ]
+      responses: { "200": { description: Déjà présent, identique }, "201": { description: Créé }, "401": { description: Jeton absent ou invalide }, "409": { description: Modèle déjà commité (immuable) }, "413": { description: Trop gros }, "422": { description: Chemin invalide ou sha256 différent du contenu } }
+  /v1/publish/model/{sha8}/commit:
+    post:
+      summary: (service GPU) Vérifie les fichiers du modèle (présence, taille, sha256, meta cohérent) puis le rend immuable
+      security: [ { publishToken: [] } ]
+      parameters: [ { $ref: "#/components/parameters/sha8" } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "schemas/model-manifest.schema.json" } } } }
+      responses: { "200": { description: Modèle commité (ou déjà commité) }, "401": { description: Jeton absent ou invalide }, "422": { description: Fichier manquant ou altéré } }
+  /v1/publish/{id}/files/{path}:
+    put:
+      summary: (service GPU) Dépose un fichier de l'instantané. Idempotent si même sha256. 8 Mo max.
+      security: [ { publishToken: [] } ]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/filePath" }, { $ref: "#/components/parameters/sha256Header" } ]
+      responses: { "200": { description: Déjà présent, identique }, "201": { description: Créé }, "401": { description: Jeton absent ou invalide }, "409": { description: Instantané déjà commité (immuable) }, "413": { description: Trop gros }, "422": { description: Chemin invalide ou sha256 différent du contenu } }
+  /v1/publish/{id}/commit:
+    post:
+      summary: (service GPU) Vérifie le modèle commité, chaque fichier (taille + sha256) et la taille des champs, puis bascule latest
+      security: [ { publishToken: [] } ]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "schemas/publish-manifest.schema.json" } } } }
+      responses: { "200": { description: latest basculé (si valid_time ≥ celui de latest) }, "401": { description: Jeton absent ou invalide }, "422": { description: Modèle non commité, fichier manquant ou altéré ; latest inchangé } }
+  /v1/heartbeat:
+    post:
+      summary: (service GPU) Battement de cœur, toutes les 60 s quand le service tourne
+      security: [ { publishToken: [] } ]
+      responses: { "204": { description: OK }, "401": { description: Jeton absent ou invalide } }
