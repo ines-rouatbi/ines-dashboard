@@ -14,6 +14,8 @@
     "test": "vitest run",
     "worker:dev": "wrangler dev",
     "contract:check": "node dev/contract-check.mjs",
+    "contract:negative": "node contract/tools/test-negative.mjs",
+    "geo:test": "node --experimental-strip-types --test tools/geo/tunisia.test.mjs",
     "contract:types": "node dev/gen-contract-types.mjs"
   },
   "dependencies": {

@@ -31,6 +31,10 @@
     { "binding": "SNAPSHOTS", "bucket_name": "atom-snapshots" }
   ]
 
+  // ATOM_ALLOW_TEST_SNAPSHOTS n'est volontairement PAS déclaré ici : sans lui, le Worker refuse tout
+  // instantané de test (versions.data_kind = "test"). En local seulement :
+  //   npx wrangler dev --var ATOM_ALLOW_TEST_SNAPSHOTS:1
+
   // Secrets (jamais dans ce fichier) :
   //   npx wrangler secret put PUBLISH_TOKEN      jeton de publication remis hors salon au service GPU
   // Secret (jamais dans ce fichier) : clé lecture-seule émise par le service d'ines.
