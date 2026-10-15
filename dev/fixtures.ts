@@ -8,7 +8,7 @@
 //   latest.json                   → <sc>/latest.json   (réponse calculée, relue comme pointeur)
 //   heartbeat.json                → synthétisé : « maintenant » si le scénario est en ligne, sinon
 //                                   le heartbeat_at figé du scénario (donc compute_status = offline)
-//   index/times.json              → <sc>/times.json (items)
+//   index/times/ (list)           → <sc>/times.json (items), une entrée par instantané
 //   models/<sha8>/_commit.json    → <sc>/models/<sha8>/model-manifest.json
 //   models/<sha8>/<chemin>        → <sc>/models/<sha8>/<chemin>
 //   snapshots/<id>/_commit.json   → <sc>/publish-manifest.json   (si <id> est l'instantané du scénario)
@@ -39,7 +39,7 @@ export interface FauxR2 {
 	get( key: string, opts?: { range?: { offset?: number; length?: number } } ): Promise<ObjetR2 | null>;
 	head( key: string ): Promise<ObjetR2 | null>;
 	put(): Promise<never>;
-	list(): Promise<{ objects: [] }>;
+	list( opts?: { prefix?: string } ): Promise<{ objects: { key: string; customMetadata: Record<string, string> }[]; truncated: false }>;
 	delete(): Promise<never>;
 }
 
@@ -91,12 +91,6 @@ export function resoudreCle( dossier: string, key: string, maintenant = () => ne
 		return at ? { contenu: JSON.stringify( { at } ) } : null;
 
 	}
-	if ( key === 'index/times.json' ) {
-
-		const t = lireJSON( join( dossier, 'times.json' ) );
-		return t ? { contenu: JSON.stringify( t.items ?? [] ) } : null;
-
-	}
 	if ( parts[ 0 ] === 'models' && parts.length >= 3 ) {
 
 		const reste = parts.slice( 2 ).join( '/' );
@@ -145,7 +139,19 @@ export function fauxR2( dossier: string ): FauxR2 {
 		async head( key ) { const o = lire( key ); return o ? objet( key, new Uint8Array( 0 ) ) : null; },
 		put: lectureSeule,
 		delete: lectureSeule,
-		async list() { return { objects: [] }; },
+		// Index des instantanés (src/v1.js : index/times/<valid_time>~<id>, données en customMetadata),
+		// synthétisé depuis <sc>/times.json. Aucun autre préfixe n'est listé.
+		async list( opts ) {
+
+			if ( opts?.prefix !== 'index/times/' ) return { objects: [], truncated: false };
+			const t = lireJSON( join( racine, 'times.json' ) ) as { items?: { snapshot_id: string; valid_time: string; open_alerts?: number | null }[] } | null;
+			const objects = ( t?.items ?? [] ).map( ( x ) => ( {
+				key: `index/times/${ x.valid_time }~${ x.snapshot_id }`,
+				customMetadata: { snapshot_id: x.snapshot_id, valid_time: x.valid_time, open_alerts: x.open_alerts == null ? '' : String( x.open_alerts ) },
+			} ) ).sort( ( a, b ) => ( a.key < b.key ? - 1 : a.key > b.key ? 1 : 0 ) );
+			return { objects, truncated: false };
+
+		},
 	};
 
 }

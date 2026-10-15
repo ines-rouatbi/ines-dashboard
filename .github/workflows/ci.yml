@@ -23,3 +23,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run contract:check
+      # Test négatif du validateur du contrat (3 défauts injectés → code 1, 3 messages).
+      - run: npm run contract:negative
+      # Carte Tunisie : tests node:test de web/src/geo/tunisia.ts et des fichiers web/public/geo/.
+      - run: npm run geo:test
