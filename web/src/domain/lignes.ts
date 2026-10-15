@@ -31,6 +31,8 @@ export interface OptionsLignes {
 	maxPas?: number;
 	/** Plafond de segments (décimation). */
 	maxSegments?: number;
+	/** Longueur minimale d'une ligne, en segments (les plus courtes sont écartées). */
+	minSegments?: number;
 }
 
 export interface Lignes {
@@ -77,12 +79,27 @@ export function bilineaireTolerante( f: Float32Array, nx: number, ny: number, fi
 export function lignesDeCourant( c: ChampHorizontal, o: OptionsLignes ): Lignes {
 
 	const { nx, ny, dx, dy, u, v } = c;
-	const h = o.h ?? 0.5, maxPas = o.maxPas ?? 80, maxSeg = o.maxSegments ?? 60_000;
+	const h = o.h ?? 0.5, maxPas = o.maxPas ?? 80, maxSeg = o.maxSegments ?? 60_000, minSeg = o.minSegments ?? 4;
 	const pas = Math.max( 1, Math.floor( o.pas ) );
-	// Occupation : une case par demi-espacement de germes (lignes espacées d'environ pas/2 nœuds).
+	// Occupation (Jobard et Lefer simplifié) : cases d'un demi-espacement. Une ligne s'arrête en entrant
+	// dans une case d'une autre ligne (distance < pas/2 environ) ; un germe dont une case voisine est
+	// occupée est ignoré (distance < pas environ). Les lignes restent donc espacées de pas/2 à pas.
 	const tc = Math.max( 0.5, pas / 2 ), ox = Math.ceil( nx / tc ) + 1, oy = Math.ceil( ny / tc ) + 1;
 	const occ = new Int32Array( ox * oy );
 	const caseDe = ( fi: number, fj: number ) => Math.floor( fj / tc ) * ox + Math.floor( fi / tc );
+
+	const voisinageOccupe = ( fi: number, fj: number ) => {
+
+		const ci = Math.floor( fi / tc ), cj = Math.floor( fj / tc );
+		for ( let b = cj - 1; b <= cj + 1; b ++ ) for ( let a = ci - 1; a <= ci + 1; a ++ ) {
+
+			if ( a >= 0 && b >= 0 && a < ox && b < oy && occ[ b * ox + a ] !== 0 ) return true;
+
+		}
+
+		return false;
+
+	};
 
 	const points = new Float32Array( maxSeg * 4 ), phases = new Float32Array( maxSeg * 2 );
 	let nSeg = 0, nLignes = 0;
@@ -128,7 +145,7 @@ export function lignesDeCourant( c: ChampHorizontal, o: OptionsLignes ): Lignes 
 
 			// Germe décalé d'un quart de pas une ligne sur deux : moins d'alignements visibles.
 			const fi = Math.min( nx - 1, i0 + ( ( j0 / pas ) % 2 ? pas / 4 : 0 ) ), fj = j0;
-			if ( occ[ caseDe( fi, fj ) ] !== 0 || ! vitesse( fi, fj ) ) continue;
+			if ( voisinageOccupe( fi, fj ) || ! vitesse( fi, fj ) ) continue;
 			const id = nLignes + 1;
 			occ[ caseDe( fi, fj ) ] = id;
 			const arriere = tracer( fi, fj, - 1, id ), avant = tracer( fi, fj, 1, id );
@@ -136,7 +153,7 @@ export function lignesDeCourant( c: ChampHorizontal, o: OptionsLignes ): Lignes 
 			const poly: number[] = [];
 			for ( let k = arriere.length - 2; k >= 0; k -= 2 ) poly.push( arriere[ k ], arriere[ k + 1 ] );
 			poly.push( fi, fj, ...avant );
-			if ( poly.length < 6 ) continue; // moins de 2 segments : bruit
+			if ( poly.length < 2 * ( minSeg + 1 ) ) continue; // trop courte : bruit visuel
 			nLignes ++;
 			let abs = 0;
 			for ( let k = 0; k + 3 < poly.length && nSeg < maxSeg; k += 2 ) {
