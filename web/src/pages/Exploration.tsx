@@ -12,7 +12,7 @@ import { DENSITES, domaineDepuisMeta, echantillonner, noeudProche, positionNoeud
 import { profilDepuisColonne, type ProfilCalcule } from '../domain/profile';
 import { capteurProche, type CapteurProche } from '../domain/capteurs';
 import { latLon } from '../domain/geo';
-import { cardinal } from '../domain/wind';
+import { cardinal, dirAffichee } from '../domain/wind';
 import { Viz, viridisCss, type PickResult, type SceneMeta } from '../scene/viz';
 import { brancherScene, signalerEchec, signalerPremierRendu, type AtomPick } from '../scene/hook';
 import { ProfileChart } from '../ui/ProfileChart';
@@ -79,7 +79,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	const [ densite, setDensite ] = useState( 3 );
 	const [ vertical, setVertical ] = useState( false );
 	const [ relief, setRelief ] = useState( true );
-	const [ plan, setPlan ] = useState<Chargement<{ stats: ReturnType<typeof statsPlan>; range: [ number, number ]; stride: number }>>( { etat: 'attente' } );
+	const [ plan, setPlan ] = useState<Chargement<{ stats: ReturnType<typeof statsPlan>; range: [ number, number ] | null; stride: number }>>( { etat: 'attente' } );
 	const [ profil, setProfil ] = useState<{ cle: string; x_m: number; y_m: number; res: Chargement<ProfilAffiche> } | null>( null );
 	const [ snapshot, setSnapshot ] = useState<Chargement<Snapshot>>( { etat: 'attente' } );
 
@@ -198,7 +198,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 			const stride = strideCible( dom.nx, dom.ny, DENSITES[ densite ] );
 			const p = echantillonner( dom, dom.altitudes[ niveau ], u, v, w, stride );
 			const r = viz.setField( p, { vertical } );
-			setPlan( { etat: 'ok', val: { stats: statsPlan( p ), range: r?.range ?? [ 0, 1 ], stride } } );
+			setPlan( { etat: 'ok', val: { stats: statsPlan( p ), range: r?.range ?? null, stride } } );
 			await viz.apresRendu();
 			if ( ! actif ) return;
 			rendu.current = niveau;
@@ -260,6 +260,8 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	const degrade = useMemo( () => `linear-gradient(90deg, ${ Array.from( { length: 10 }, ( _, i ) => viridisCss( i / 9 ) ).join( ',' ) })`, [] );
 	const georef = metaV?.georef ?? null;
 	const nd = 'non disponible';
+	/** Vitesse à 0,1 m/s, ou « non disponible » (jamais 0 pour l'inconnu). */
+	const nd1 = ( x: number | null ) => ( x == null ? nd : fmt( x, 1 ) );
 	const snap = snapshot.etat === 'ok' ? snapshot.val : null;
 
 	let messageScene: string | null = null;
@@ -306,11 +308,17 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 				</label>
 
 				<div className="legende">
-					<div className="legende-titre">Vitesse du vent</div>
+					<div className="legende-titre">Vitesse horizontale du vent</div>
 					<div className="legende-barre" style={ { background: degrade } } />
 					<div className="legende-echelle num">
-						<span>{ plan.etat === 'ok' ? fmt( plan.val.range[ 0 ], 1 ) : '—' }</span>
-						<span>{ plan.etat === 'ok' ? `${ fmt( plan.val.range[ 1 ], 1 ) } m/s` : '— m/s' }</span>
+						{ plan.etat === 'ok' && ! plan.val.range
+							? <span data-testid="legende-nd">non disponible (niveau entièrement sous le relief)</span>
+							: (
+								<>
+									<span>{ plan.etat === 'ok' && plan.val.range ? fmt( plan.val.range[ 0 ], 1 ) : '—' }</span>
+									<span>{ plan.etat === 'ok' && plan.val.range ? `${ fmt( plan.val.range[ 1 ], 1 ) } m/s` : '— m/s' }</span>
+								</>
+							) }
 					</div>
 				</div>
 
@@ -348,9 +356,9 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 					<h3>Niveau sélectionné</h3>
 					{ plan.etat === 'ok' ? (
 						<div className="stats num">
-							<div><b>{ fmt( plan.val.stats.min, 1 ) }</b><span>min m/s</span></div>
-							<div><b>{ fmt( plan.val.stats.moy, 1 ) }</b><span>moy m/s</span></div>
-							<div><b>{ fmt( plan.val.stats.max, 1 ) }</b><span>max m/s</span></div>
+							<div><b>{ nd1( plan.val.stats.min ) }</b><span>min m/s</span></div>
+							<div><b>{ nd1( plan.val.stats.moy ) }</b><span>moy m/s</span></div>
+							<div><b>{ nd1( plan.val.stats.max ) }</b><span>max m/s</span></div>
 							<p className="muet petit">{ fmt( plan.val.stats.couverture * 100 ) } % de couverture (hors relief)</p>
 						</div>
 					) : <p className="muet">{ plan.etat === 'erreur' ? plan.message : '—' }</p> }
@@ -388,11 +396,11 @@ function Profil( { profil }: { profil: { res: Chargement<ProfilAffiche> } | null
 						<tr key={ l.z_asl_m } className={ l.below_terrain ? 'sous-relief' : undefined }>
 							<td>{ fmt( l.z_asl_m ) } m</td>
 							<td>{ fmt( l.z_agl_m ) } m</td>
-							{ l.below_terrain ? <td colSpan={ 4 }>sous le relief</td> : (
+							{ l.below_terrain ? <td colSpan={ 4 }>sous le relief</td> : l.speed == null ? <td colSpan={ 4 } data-testid="niveau-nd">non disponible</td> : (
 								<>
 									<td>{ fmt( l.speed, 1 ) }</td>
 									<td>{ fmt( l.speed_interval.p10, 1 ) }–{ fmt( l.speed_interval.p90, 1 ) }</td>
-									<td>{ l.dir_from_deg == null ? 'calme' : `${ cardinal( l.dir_from_deg ) } ${ fmt( l.dir_from_deg ) }°` }</td>
+									<td>{ l.dir_from_deg == null ? 'calme' : `${ cardinal( l.dir_from_deg ) } ${ dirAffichee( l.dir_from_deg ) }°` }</td>
 									<td>{ l.status === 'mesure' ? 'mesuré' : l.status === 'estime' ? 'estimé' : '—' }</td>
 								</>
 							) }

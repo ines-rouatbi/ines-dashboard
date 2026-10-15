@@ -114,18 +114,21 @@ export function echantillonner(
 
 }
 
-/** Statistiques de vitesse 3D d'un plan (hors relief). */
-export function statsPlan( p: Plan ): { min: number; moy: number; max: number; couverture: number } {
+/**
+ * Statistiques de vitesse HORIZONTALE ‖(u, v)‖ d'un plan (hors relief), comme `speed` du contrat.
+ * Plan entièrement sous le relief : min, moy et max valent null (« non disponible », jamais 0).
+ */
+export function statsPlan( p: Plan ): { min: number | null; moy: number | null; max: number | null; couverture: number } {
 
 	let lo = Infinity, hi = - Infinity, sum = 0, n = 0;
 	for ( let i = 0; i < p.mask.length; i ++ ) if ( p.mask[ i ] ) {
 
-		const s = Math.hypot( p.u[ i ], p.v[ i ], p.w[ i ] );
+		const s = Math.hypot( p.u[ i ], p.v[ i ] );
 		if ( s < lo ) lo = s; if ( s > hi ) hi = s; sum += s; n ++;
 
 	}
 
-	if ( ! n ) return { min: 0, moy: 0, max: 0, couverture: 0 };
+	if ( ! n ) return { min: null, moy: null, max: null, couverture: 0 };
 	return { min: lo, moy: sum / n, max: hi, couverture: n / p.mask.length };
 
 }

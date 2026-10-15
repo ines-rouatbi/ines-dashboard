@@ -12,17 +12,33 @@ export function vitesseH( u: number, v: number ): number { return Math.hypot( u,
 /** Vitesse 3D (m/s). */
 export function vitesse3D( u: number, v: number, w: number ): number { return Math.hypot( u, v, w ); }
 
+/** Arrondit un angle à `decimales` AVANT le modulo 360 (contrat m4) : 359,996 → 0 à 0,01 près. */
+export function arrondirAngle( deg: number, decimales: number ): number {
+
+	const p = 10 ** decimales;
+	const d = ( ( Math.round( deg * p ) / p ) % 360 + 360 ) % 360;
+	return d + 0; // pas de « -0 »
+
+}
+
 /**
- * Direction météo « d'où vient le vent », en degrés [0, 360).
- * (270 − atan2(v, u)·180/π) mod 360 ; `null` si la vitesse horizontale < 0,2 m/s.
+ * Direction météo « d'où vient le vent », en degrés [0, 360), à 0,01° près comme le contrat.
+ * (270 − atan2(v, u)·180/π), arrondie à 0,01° AVANT le modulo 360 (m4) ; `null` si la vitesse
+ * horizontale < 0,2 m/s.
  */
 export function dirFrom( u: number, v: number ): number | null {
 
 	if ( ! Number.isFinite( u ) || ! Number.isFinite( v ) ) return null;
 	if ( vitesseH( u, v ) < SEUIL_CALME ) return null;
-	const d = ( ( 270 - Math.atan2( v, u ) * 180 / Math.PI ) % 360 + 360 ) % 360;
-	// Évite 360 par arrondi flottant et le « -0 ».
-	return d >= 360 - 1e-9 ? 0 : d + 0;
+	return arrondirAngle( 270 - Math.atan2( v, u ) * 180 / Math.PI, 2 );
+
+}
+
+/** Direction affichée à `decimales` près : l'arrondi d'affichage passe aussi AVANT le modulo (359,6 → « 0 »). */
+export function dirAffichee( dir: number | null, decimales = 0 ): string {
+
+	if ( dir == null || ! Number.isFinite( dir ) ) return 'calme';
+	return arrondirAngle( dir, decimales ).toLocaleString( 'fr-FR', { minimumFractionDigits: decimales, maximumFractionDigits: decimales } );
 
 }
 

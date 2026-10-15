@@ -34,10 +34,12 @@ export function intervalle80( speed: number | null, sigma: number | null ): Prof
 export function niveauDepuisColonne( l: ColumnLevel ): ProfileLevel {
 
 	const base = { z_asl_m: l.z_asl_m, z_agl_m: l.z_agl_m, below_terrain: l.below_terrain };
+	// Sous le relief : below_terrain = true. Au-dessus du relief mais sans valeur (null) : below_terrain
+	// reste false et tout est null (« non disponible »), jamais présenté comme « sous le relief ».
 	if ( l.below_terrain || l.u == null || l.v == null || l.speed == null ) {
 
 		return {
-			...base, below_terrain: true,
+			...base,
 			u: null, v: null, w: null, speed: null, sigma_speed: null, dir_from_deg: null,
 			speed_interval: { p10: null, p50: null, p90: null },
 			status: null, coverage: null, reliability: null, reliability_class: null,
