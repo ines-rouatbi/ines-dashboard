@@ -34,7 +34,7 @@ button.atom-kpi:hover { transform: translateY(-2px); }
 
 /* Éoliennes animées (UI v2) */
 .rotors { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 4px 0 12px; }
-.rotor { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 12px; background: var( --atom-card ); border: 1px solid var( --atom-line ); border-radius: var( --rayon ); box-shadow: var( --ombre ); min-width: 150px; }
+.rotor { overflow: hidden; margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 12px; background: var( --atom-card ); border: 1px solid var( --atom-line ); border-radius: var( --rayon ); box-shadow: var( --ombre ); min-width: 150px; }
 .rotor svg { width: 72px; height: 100px; overflow: visible; }
 .rotor-mat { fill: var( --encre-3 ); }
 .rotor-pales path { fill: var( --encre-2 ); }
@@ -43,6 +43,9 @@ button.atom-kpi:hover { transform: translateY(-2px); }
 .rotor-pales.tourne { animation: rotor var(--periode) linear infinite; }
 @keyframes rotor { to { transform: rotate(360deg); } }
 .rotor-production .rotor-pales path { fill: var( --accent ); }
+.rotor-ralenti .rotor-pales path { fill: var( --encre-3 ); }
+.rotor-filets line { stroke: var( --accent ); stroke-width: 1.4; stroke-linecap: round; opacity: 0; animation: filet var(--filet) linear infinite; }
+@keyframes filet { 0% { transform: translateX(0); opacity: 0; } 15% { opacity: .55; } 85% { opacity: .55; } 100% { transform: translateX(130px); opacity: 0; } }
 .rotor figcaption { display: flex; flex-direction: column; align-items: center; text-align: center; font-size: 12px; gap: 1px; }
 .rotors-note { flex-basis: 100%; margin: 0; }
 .atom-alert { background: var( --atom-card ); border: 1px solid var( --atom-line ); border-left: 4px solid; border-radius: 8px; padding: 10px 12px; }

@@ -3,7 +3,7 @@
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { periodeRotor, Rotors } from './eolien/Rotors';
+import { dureeFilet, periodeRalenti, periodeRotor, Rotors } from './eolien/Rotors';
 import { filtrerAlertes } from './alertes/AlertesPage';
 import { Jauge, longueurArc } from '../ui/Jauge';
 import { bornerPourcent } from './comparaison/AvantApres';
@@ -32,9 +32,34 @@ describe( 'rotors animés', () => {
 		expect( periodeRotor( turbine( { state: 'indisponible' } ) ) ).toBeNull();
 		expect( periodeRotor( turbine( { hub_speed: { p10: null, p50: null, p90: null } } ) ) ).toBeNull();
 		const html = renderToStaticMarkup( <Rotors turbines={ [ turbine( { state: 'arret_vent_faible', hub_speed: { p10: 0, p50: 1.22, p90: 2.62 } } ) ] } /> );
-		expect( html ).toContain( 'data-tourne="non"' );
+		expect( html ).toContain( 'data-mode="ralenti"' );
 		expect( html ).toContain( 'À l’arrêt : vent trop faible' );
+		expect( html ).toContain( 'rotor au ralenti, sans production' );
 		expect( html ).toContain( '1,2 m/s' );
+
+	} );
+
+	it( 'au ralenti à l’arrêt (vent faible ou fort), plus lent que la production ; immobile si indisponible', () => {
+
+		expect( periodeRalenti( turbine( { state: 'arret_vent_faible', hub_speed: { p10: 0, p50: 1.22, p90: 2.62 } } ) ) ).toBeCloseTo( 9.836, 2 );
+		expect( periodeRalenti( turbine( { state: 'arret_vent_faible', hub_speed: { p10: 0, p50: 0.5, p90: 1 } } ) ) ).toBe( 10 );
+		expect( periodeRalenti( turbine( { state: 'arret_vent_fort', hub_speed: { p10: 25, p50: 27, p90: 30 } } ) ) ).toBe( 8 );
+		expect( periodeRalenti( turbine( {} ) ) ).toBeNull();
+		expect( periodeRalenti( turbine( { state: 'indisponible' } ) ) ).toBeNull();
+		expect( periodeRalenti( turbine( { state: 'arret_vent_faible', hub_speed: { p10: null, p50: null, p90: null } } ) ) ).toBeNull();
+		const html = renderToStaticMarkup( <Rotors turbines={ [ turbine( { state: 'indisponible' } ) ] } /> );
+		expect( html ).toContain( 'data-tourne="non"' );
+		expect( html ).toContain( 'data-mode="immobile"' );
+
+	} );
+
+	it( 'filets d’air à la vitesse du vent publié (bornés), absents sans vent', () => {
+
+		expect( dureeFilet( 2 ) ).toBe( 3 );
+		expect( dureeFilet( 30 ) ).toBe( 0.6 );
+		expect( dureeFilet( 0.1 ) ).toBe( 6 );
+		expect( dureeFilet( null ) ).toBeNull();
+		expect( dureeFilet( 0 ) ).toBeNull();
 
 	} );
 
