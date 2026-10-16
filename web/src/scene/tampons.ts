@@ -29,13 +29,24 @@ export function altitudeSurface( g: Grille, s: Surface, fi: number, fj: number )
 
 }
 
-export interface TamponLignes { positions: Float32Array; couleurs: Float32Array; phases: Float32Array; sommets: number }
+export interface TamponLignes {
+	positions: Float32Array;
+	couleurs: Float32Array;
+	phases: Float32Array;
+	sommets: number;
+	/** Vitesse horizontale publiée (m/s) à chaque sommet, interpolée (traceurs animés, UI v2) ; absente si non fournie. */
+	vitesses?: Float32Array | null;
+}
 
-/** Lignes de courant (fi, fj) → sommets 3D colorés par la variable `valeurs` (NaN → neutre). */
-export function tamponLignes( g: Grille, s: Surface, l: Lignes, valeurs: Float32Array | null, e: Echelle | null ): TamponLignes {
+/**
+ * Lignes de courant (fi, fj) → sommets 3D colorés par la variable `valeurs` (NaN → neutre) ; `vitesse` (champ speed
+ * du plan) donne la vitesse de chaque sommet pour l'animation des traceurs.
+ */
+export function tamponLignes( g: Grille, s: Surface, l: Lignes, valeurs: Float32Array | null, e: Echelle | null, vitesse: Float32Array | null = null ): TamponLignes {
 
 	const n = l.segments * 2;
 	const positions = new Float32Array( n * 3 ), couleurs = new Float32Array( n * 3 ), phases = new Float32Array( n );
+	const vitesses = vitesse ? new Float32Array( n ) : null;
 	for ( let k = 0; k < n; k ++ ) {
 
 		const fi = l.points[ k * 2 ], fj = l.points[ k * 2 + 1 ];
@@ -45,10 +56,11 @@ export function tamponLignes( g: Grille, s: Surface, l: Lignes, valeurs: Float32
 		const c = valeurs ? couleur( e, bilineaireTolerante( valeurs, g.nx, g.ny, fi, fj ) ) : NEUTRE;
 		couleurs[ k * 3 ] = c[ 0 ]; couleurs[ k * 3 + 1 ] = c[ 1 ]; couleurs[ k * 3 + 2 ] = c[ 2 ];
 		phases[ k ] = l.phases[ k ];
+		if ( vitesses ) vitesses[ k ] = bilineaireTolerante( vitesse!, g.nx, g.ny, fi, fj );
 
 	}
 
-	return { positions, couleurs, phases, sommets: n };
+	return { positions, couleurs, phases, sommets: n, vitesses };
 
 }
 

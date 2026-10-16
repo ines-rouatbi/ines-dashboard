@@ -11,17 +11,31 @@
 // l'écoulement animé dans le shader) ; coupe horizontale et coupe verticale ; capteurs et éoliennes
 // (InstancedMesh) ; marqueur de la colonne cliquée. Picking analytique (rayon / surface) : pas de
 // lancer de rayon sur 250 000 triangles.
+//
+// UI v2 : traceurs lumineux qui avancent le long des lignes de courant (Points, tampons préalloués, mis à jour sans
+// allocation : scene/traceurs.ts) ; fondu d'affichage des lignes quand le plan change (autre instant, autre hauteur) ;
+// caméra animée (« voler vers » le point cliqué, vues prédéfinies dessus / sud / est / isométrique) ; rotation
+// automatique douce en option. Animations réduites : traceurs masqués, transitions instantanées, pas de rotation.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { intersecterSurface, libelleDistance, longueurEchelle } from '../domain/maillage';
 import { bilineaireTolerante } from '../domain/lignes';
 import { teinteRelief, type TamponLignes, type TamponMaillage } from './tampons';
+import { Traceurs } from './traceurs';
+import { mouvementReduit, surPreferences } from '../ui/preferences';
 
 /** Largeur de la scène (unités three.js) pour l'étendue Est du domaine. */
 const W = 100;
 /** Capacité des lignes de courant (segments) : tampon alloué une fois. */
 export const CAPACITE_SEGMENTS = 60_000;
+/** Capacité des traceurs animés (points) : tampon alloué une fois. */
+export const CAPACITE_TRACEURS = 4000;
+
+export type VueCamera = 'dessus' | 'sud' | 'est' | 'iso';
+
+/** Courbe des transitions de caméra (douce aux deux bouts). */
+const doux = ( t: number ) => ( t < 0.5 ? 4 * t * t * t : 1 - ( - 2 * t + 2 ) ** 3 / 2 );
 
 export interface DomaineScene {
 	nx: number;
@@ -93,13 +107,37 @@ void main() {
 const FRAGMENT_LIGNES = /* glsl */`
 uniform float uTemps;
 uniform float uAnime;
+uniform float uOpacite;
 varying vec3 vCouleur;
 varying float vPhase;
 void main() {
 	// Traits qui avancent dans le sens de l'écoulement (phase = abscisse curviligne, en cellules).
 	float f = fract( vPhase * 0.18 - uTemps * 0.5 );
 	float a = mix( 0.95, 0.30 + 0.70 * smoothstep( 0.0, 0.85, f ), uAnime );
-	gl_FragColor = vec4( vCouleur, a );
+	gl_FragColor = vec4( vCouleur, a * uOpacite );
+}`;
+
+const VERTEX_TRACEURS = /* glsl */`
+attribute vec3 aCouleur;
+uniform float uTaille;
+varying vec3 vCouleur;
+void main() {
+	vCouleur = aCouleur;
+	vec4 mv = modelViewMatrix * vec4( position, 1.0 );
+	gl_Position = projectionMatrix * mv;
+	gl_PointSize = clamp( uTaille * 140.0 / max( 1.0, - mv.z ), 2.0, 9.0 * uTaille / 4.0 );
+}`;
+
+const FRAGMENT_TRACEURS = /* glsl */`
+uniform float uOpacite;
+varying vec3 vCouleur;
+void main() {
+	// Point rond à cœur blanc et halo coloré.
+	float r = length( gl_PointCoord - 0.5 );
+	if ( r > 0.5 ) discard;
+	float a = smoothstep( 0.5, 0.05, r );
+	vec3 c = mix( vCouleur, vec3( 1.0 ), smoothstep( 0.22, 0.0, r ) * 0.8 );
+	gl_FragColor = vec4( c, a * uOpacite );
 }`;
 
 export class Viz {
@@ -138,6 +176,20 @@ export class Viz {
 	private etiquettes: { sprite: THREE.Sprite; local: THREE.Vector3; dy: number }[] = [];
 	private surfacePick: ( ( x: number, y: number ) => number ) | null = null;
 	private anime = true;
+	/** Traceurs animés le long des lignes (UI v2). */
+	private readonly traceurs = new Traceurs( CAPACITE_TRACEURS );
+	private readonly points: THREE.Points;
+	private readonly matPoints: THREE.ShaderMaterial;
+	private traceursActifs = true;
+	/** « Voler vers » le point cliqué (clic de l'utilisatrice, jamais le picking du crochet de test). */
+	volerAuClic = true;
+	private _tween: { t0: number; duree: number; p0: THREE.Vector3; p1: THREE.Vector3; c0: THREE.Vector3; c1: THREE.Vector3 } | null = null;
+	private _fondu = 0;
+	private _reduit = mouvementReduit();
+	private _rotation = false;
+	private readonly _desabo: () => void;
+	private readonly _boucle: () => void;
+	private _tPrec = 0;
 
 	private readonly _ray = new THREE.Raycaster();
 	private readonly _m = new THREE.Matrix4();
@@ -193,7 +245,7 @@ export class Viz {
 		gl.setDrawRange( 0, 0 );
 		this.matLignes = new THREE.ShaderMaterial( {
 			vertexShader: VERTEX_LIGNES, fragmentShader: FRAGMENT_LIGNES,
-			uniforms: { uTemps: { value: 0 }, uAnime: { value: 1 } }, transparent: true, depthWrite: false,
+			uniforms: { uTemps: { value: 0 }, uAnime: { value: 1 }, uOpacite: { value: 1 } }, transparent: true, depthWrite: false,
 		} );
 		this.lignes = new THREE.LineSegments( gl, this.matLignes );
 		this.lignes.frustumCulled = false;
@@ -213,16 +265,29 @@ export class Viz {
 		this.teteMarqueur = new THREE.Mesh( new THREE.SphereGeometry( 0.7, 16, 12 ), new THREE.MeshBasicMaterial( { color: 0x41d0c4, depthTest: false } ) );
 		this.teteMarqueur.visible = false;
 		this.teteMarqueur.renderOrder = 9;
-		this.monde.add( this.lignes, this.coupeH, this.coupeV, this.marqueur );
+		// Traceurs : positions et couleurs préallouées, réécrites à chaque image sur la plage utile.
+		const gp = new THREE.BufferGeometry();
+		gp.setAttribute( 'position', new THREE.BufferAttribute( this.traceurs.positions, 3 ).setUsage( THREE.DynamicDrawUsage ) );
+		gp.setAttribute( 'aCouleur', new THREE.BufferAttribute( this.traceurs.couleurs, 3 ).setUsage( THREE.DynamicDrawUsage ) );
+		gp.setDrawRange( 0, 0 );
+		this.matPoints = new THREE.ShaderMaterial( {
+			vertexShader: VERTEX_TRACEURS, fragmentShader: FRAGMENT_TRACEURS,
+			uniforms: { uTaille: { value: 4 }, uOpacite: { value: 1 } },
+			transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+		} );
+		this.points = new THREE.Points( gp, this.matPoints );
+		this.points.frustumCulled = false;
+		this.points.renderOrder = 4;
+		this.monde.add( this.lignes, this.points, this.coupeH, this.coupeV, this.marqueur );
 		this.hors.add( this.teteMarqueur );
 
-		this._onPointerDown = ( e ) => { this._appui = { x: e.clientX, y: e.clientY }; };
+		this._onPointerDown = ( e ) => { this._appui = { x: e.clientX, y: e.clientY }; this._tween = null; };
 		// Un clic (pas une rotation de caméra) déclenche le picking.
 		this._onPointerUp = ( e ) => {
 
 			const a = this._appui;
 			this._appui = null;
-			if ( a && Math.hypot( e.clientX - a.x, e.clientY - a.y ) < 5 ) this.pickAt( e.clientX, e.clientY );
+			if ( a && Math.hypot( e.clientX - a.x, e.clientY - a.y ) < 5 ) this.pickAt( e.clientX, e.clientY, this.volerAuClic );
 
 		};
 		this._onResize = () => this._resize();
@@ -231,8 +296,20 @@ export class Viz {
 		addEventListener( 'resize', this._onResize );
 		this._ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver( this._onResize ) : null;
 		this._ro?.observe( canvas );
+		this._desabo = surPreferences( () => { this._reduit = mouvementReduit(); this._appliquerMouvement(); } );
+		this._boucle = () => this._animate();
+		this._appliquerMouvement();
 		this._resize();
 		this._animate();
+
+	}
+
+	/** Animations réduites : pas de traits animés, de traceurs, de rotation ni de transitions. */
+	private _appliquerMouvement() {
+
+		this.matLignes.uniforms.uAnime.value = this.anime && ! this._reduit ? 1 : 0;
+		this.points.visible = this.anime && this.traceursActifs && ! this._reduit && this.traceurs.n > 0;
+		this.controls.autoRotate = this._rotation && ! this._reduit;
 
 	}
 
@@ -247,12 +324,45 @@ export class Viz {
 
 	private _animate() {
 
-		this._raf = requestAnimationFrame( () => this._animate() );
+		this._raf = requestAnimationFrame( this._boucle );
 		const t = performance.now();
 		if ( this._derniere ) { this._durees[ this._nDurees % this._durees.length ] = t - this._derniere; this._nDurees ++; }
 		this._derniere = t;
-		this.controls.update();
-		if ( this.anime ) this.matLignes.uniforms.uTemps.value = this._horloge.getElapsedTime();
+		const dt = this._tPrec ? Math.min( 0.05, ( t - this._tPrec ) / 1000 ) : 1 / 60;
+		this._tPrec = t;
+		const tw = this._tween;
+		if ( tw ) {
+
+			const f = Math.min( 1, ( t - tw.t0 ) / tw.duree ), e = doux( f );
+			this.camera.position.lerpVectors( tw.p0, tw.p1, e );
+			this.controls.target.lerpVectors( tw.c0, tw.c1, e );
+			if ( f >= 1 ) this._tween = null;
+
+		}
+		this.controls.update( dt );
+		if ( this.anime && ! this._reduit ) this.matLignes.uniforms.uTemps.value = this._horloge.getElapsedTime();
+		// Fondu d'affichage des lignes et des traceurs après un changement de plan (aucune donnée interpolée).
+		if ( this._fondu ) {
+
+			const f = Math.min( 1, ( t - this._fondu ) / 650 );
+			this.matLignes.uniforms.uOpacite.value = this.matPoints.uniforms.uOpacite.value = 0.15 + 0.85 * doux( f );
+			if ( f >= 1 ) this._fondu = 0;
+
+		}
+		if ( this.points.visible ) {
+
+			this.traceurs.avancer( dt, 7 );
+			const g = this.points.geometry, n = this.traceurs.n;
+			for ( const a of [ 'position', 'aCouleur' ] ) {
+
+				const at = g.attributes[ a ] as THREE.BufferAttribute;
+				at.clearUpdateRanges();
+				at.addUpdateRange( 0, n * 3 );
+				at.needsUpdate = true;
+
+			}
+
+		}
 		this.renderer.render( this.scene, this.camera );
 		this.frames ++;
 		if ( this._attenteRendu.length ) {
@@ -489,11 +599,66 @@ export class Viz {
 		}
 
 		g.setDrawRange( 0, n );
+		// Fondu d'entrée si des lignes étaient déjà affichées (changement d'instant ou de hauteur).
+		if ( this.segments > 0 && n && ! this._reduit ) this._fondu = performance.now();
 		this.segments = n / 2;
+		// Traceurs : environ un pour 12 segments, bornés à la capacité.
+		const tl = t && n ? ( n === t.sommets ? t : { ...t, sommets: n } ) : null;
+		this.traceurs.charger( tl, Math.min( CAPACITE_TRACEURS, Math.round( n / 2 / 12 ) ) );
+		this.points.geometry.setDrawRange( 0, this.traceurs.n );
+		this._appliquerMouvement();
 
 	}
 
-	setAnimation( on: boolean ) { this.anime = on; this.matLignes.uniforms.uAnime.value = on ? 1 : 0; }
+	setAnimation( on: boolean ) { this.anime = on; this._appliquerMouvement(); }
+
+	/** Traceurs lumineux le long des lignes (si l'animation est active). */
+	setTraceurs( on: boolean ) { this.traceursActifs = on; this._appliquerMouvement(); }
+
+	get nbTraceurs() { return this.points.visible ? this.traceurs.n : 0; }
+
+	/** Rotation automatique douce autour du domaine (coupée en animations réduites). */
+	setAutoRotation( on: boolean ) { this._rotation = on; this.controls.autoRotateSpeed = 0.6; this._appliquerMouvement(); }
+
+	/** Déplace la caméra (monde) vers `position` en visant `cible`, en douceur (instantané en mouvement réduit). */
+	allerVers( position: THREE.Vector3, cible: THREE.Vector3, duree = 900 ): Promise<void> {
+
+		if ( this._reduit || duree <= 0 ) {
+
+			this._tween = null;
+			this.camera.position.copy( position ); this.controls.target.copy( cible ); this.controls.update();
+			return this.apresRendu();
+
+		}
+		this._tween = { t0: performance.now(), duree, p0: this.camera.position.clone(), p1: position.clone(), c0: this.controls.target.clone(), c1: cible.clone() };
+		return new Promise( ( ok ) => setTimeout( ok, duree + 32 ) );
+
+	}
+
+	/** Vues prédéfinies : dessus, depuis le sud, depuis l'est, isométrique (cadrage par défaut). */
+	vue( v: VueCamera ): Promise<void> {
+
+		const d = this.domaine;
+		const D = d ? W * d.sizeY / d.sizeX : W / 2;
+		const c = new THREE.Vector3( 0, 2, 0 );
+		const p = v === 'dessus' ? new THREE.Vector3( 0, W * 1.15, 0.01 )
+			: v === 'sud' ? new THREE.Vector3( 0, W * 0.32, D / 2 + W * 0.85 )
+				: v === 'est' ? new THREE.Vector3( W / 2 + W * 0.8, W * 0.32, 0 )
+					: new THREE.Vector3( W * 0.3, W * 0.8, D * 0.5 + W * 0.55 );
+		return this.allerVers( p, c );
+
+	}
+
+	/** « Voler vers » un point (m, repère local) : la caméra s'en approche en gardant son orientation. */
+	volerVers( x: number, z: number, yNord: number ): Promise<void> {
+
+		const cible = this._versMonde( new THREE.Vector3( x, z, - yNord ) );
+		const dir = this.camera.position.clone().sub( this.controls.target );
+		const dist = Math.max( 22, Math.min( dir.length() * 0.6, 90 ) );
+		dir.setLength( dist );
+		return this.allerVers( cible.clone().add( dir ), cible, 1100 );
+
+	}
 
 	private _maillage( m: THREE.Mesh, t: TamponMaillage | null ) {
 
@@ -619,7 +784,7 @@ export class Viz {
 	 * Picking à une position écran (coordonnées client, px) : intersection du rayon avec la surface
 	 * affichée (plan de la coupe horizontale ou relief + h), à défaut le relief. Appelle `onPick`.
 	 */
-	pickAt( clientX: number, clientY: number ): PickResult | null {
+	pickAt( clientX: number, clientY: number, voler = false ): PickResult | null {
 
 		const d = this.domaine;
 		if ( ! d ) return null;
@@ -640,6 +805,7 @@ export class Viz {
 		if ( ! hit ) return null;
 		const res = { x: hit.x, y: hit.y, z: hit.z, fx: hit.x / d.sizeX, fy: hit.y / d.sizeY };
 		this.onPick?.( res );
+		if ( voler ) this.volerVers( hit.x, hit.z, hit.y );
 		return res;
 
 	}
@@ -647,6 +813,7 @@ export class Viz {
 	dispose() {
 
 		cancelAnimationFrame( this._raf );
+		this._desabo();
 		this.canvas.removeEventListener( 'pointerdown', this._onPointerDown );
 		this.canvas.removeEventListener( 'pointerup', this._onPointerUp );
 		removeEventListener( 'resize', this._onResize );

@@ -20,7 +20,8 @@ import { moyenneMax, niveauxUtiles, planHauteurSol } from '../domain/hauteurSolS
 import { bilineaireTolerante, lignesDeCourant, type Lignes } from '../domain/lignes';
 import { echelle as calculerEchelle, VARIABLE_COLORATION, type Coloration, type Echelle } from '../domain/palettes';
 import { libelleDistance } from '../domain/maillage';
-import { Viz, type PickResult, type Repere, type Visibilite } from '../scene/viz';
+import { Viz, type PickResult, type Repere, type Visibilite, type VueCamera } from '../scene/viz';
+import { useMouvementReduit } from '../ui/preferences';
 import { tamponCoupeH, tamponCoupeV, tamponLignes, type AxeCoupe, type Grille, type Surface } from '../scene/tampons';
 import { brancherScene, signalerEchec, signalerPremierRendu, type AtomEtat, type AtomPick, type AtomReglages } from '../scene/hook';
 import { ProfileChart } from '../ui/ProfileChart';
@@ -399,7 +400,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 		const viz = vizRef.current;
 		if ( ! viz || ! m || ! planOk ) return;
 		if ( r.coupeV && ! coupeOk && coupeV?.etat !== 'erreur' ) return; // la coupe arrive
-		viz.setLignes( tamponLignes( m.grille, planOk.surface, planOk.lignes, planOk.val, ech ) );
+		viz.setLignes( tamponLignes( m.grille, planOk.surface, planOk.lignes, planOk.val, ech, planOk.speed ) );
 		viz.setCoupeH( r.coupeH ? tamponCoupeH( m.grille, planOk.surface, planOk.u, planOk.val, ech ) : null );
 		viz.setCoupeV( coupeOk ? tamponCoupeV( m.grille, coupeOk.axe, coupeOk.indice, ( k ) => coupeOk.niveaux[ k ], ech ) : null );
 		// Le clic vise la surface affichée (jamais sous le relief), à défaut le relief.
@@ -450,6 +451,37 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	useEffect( () => { vizRef.current?.setVisibilite( visibilite( r ) ); }, [ r, m, couches ] );
 	useEffect( () => { vizRef.current?.setExageration( r.exageration ); }, [ r.exageration, m ] );
 	useEffect( () => { vizRef.current?.setAnimation( r.animation ); }, [ r.animation ] );
+
+	// UI v2 : traceurs, rotation automatique, « voler vers » le point cliqué, vues prédéfinies, balayage de la coupe.
+	const reduit = useMouvementReduit();
+	const [ traceurs, setTraceurs ] = useState( true );
+	const [ rotation, setRotation ] = useState( false );
+	const [ voler, setVoler ] = useState( true );
+	const [ balayage, setBalayage ] = useState( false );
+	useEffect( () => { vizRef.current?.setTraceurs( traceurs ); }, [ traceurs ] );
+	useEffect( () => { vizRef.current?.setAutoRotation( rotation ); }, [ rotation ] );
+	useEffect( () => { if ( vizRef.current ) vizRef.current.volerAuClic = voler; }, [ voler ] );
+	// Balayage : la coupe verticale traverse le domaine, une position après l'autre, chacune rendue avant la suivante.
+	useEffect( () => {
+
+		if ( ! balayage || ! rRef.current.coupeV || reduit ) { if ( balayage && reduit ) setBalayage( false ); return; }
+		let vivant = true;
+		( async () => {
+
+			let x = rRef.current.coupeVPos >= 0.98 ? 0 : rRef.current.coupeVPos;
+			while ( vivant && x <= 1 ) {
+
+				await Promise.all( [ regler( { coupeVPos: Math.round( x * 100 ) / 100 } ), new Promise( ( ok ) => setTimeout( ok, 90 ) ) ] );
+				x += 0.02;
+
+			}
+			if ( vivant ) setBalayage( false );
+
+		} )();
+		return () => { vivant = false; };
+
+	}, [ balayage, reduit, regler ] );
+	const vue = ( v: VueCamera ) => { setRotation( false ); vizRef.current?.vue( v ); };
 
 	// 12. Clic → nœud natif le plus proche, marqueur, profil (une requête /v1/column).
 	const surPick = useRef<( p: PickResult ) => AtomPick | null>( () => null );
@@ -597,12 +629,12 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 						<label key={ c } className="en-ligne"><input type="radio" name="coloration" checked={ r.coloration === c } onChange={ () => regler( { coloration: c } ) } /> { t }</label>
 					) ) }
 				</fieldset>
-				<Legende coloration={ r.coloration } echelle={ ech } absente={ ! variablePubliee ? 'variable non publiée par ce modèle' : planOk && ! planOk.stats.valides ? 'non disponible (plan entièrement sous le relief)' : null } />
 
 				<fieldset className="champ">
 					<legend>Lignes de courant</legend>
 					<label className="en-ligne"><input type="checkbox" checked={ r.lignes } onChange={ ( e ) => regler( { lignes: e.target.checked } ) } /> Afficher <span className="muet num">{ planOk ? `(${ fmt( planOk.lignes.lignes ) } lignes)` : '' }</span></label>
 					<label className="en-ligne"><input type="checkbox" checked={ r.animation } onChange={ ( e ) => regler( { animation: e.target.checked } ) } /> Animer le sens de l'écoulement</label>
+					<label className="en-ligne"><input type="checkbox" checked={ traceurs } disabled={ ! r.animation || reduit } onChange={ ( e ) => setTraceurs( e.target.checked ) } data-testid="traceurs" /> Traceurs lumineux { reduit ? <span className="muet petit">(animations réduites)</span> : null }</label>
 					<input type="range" min={ 0 } max={ DENSITES_LIGNES.length - 1 } step={ 1 } value={ r.densite } onChange={ ( e ) => regler( { densite: Number( e.target.value ) } ) } aria-label="Densité des lignes de courant" />
 				</fieldset>
 
@@ -619,8 +651,11 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 					</label>
 					{ r.coupeV && (
 						<>
-							<input type="range" min={ 0 } max={ 1 } step={ 0.01 } value={ r.coupeVPos } onChange={ ( e ) => regler( { coupeVPos: Number( e.target.value ) } ) } aria-label="Position de la coupe verticale" />
+							<input type="range" min={ 0 } max={ 1 } step={ 0.01 } value={ r.coupeVPos } onChange={ ( e ) => { setBalayage( false ); regler( { coupeVPos: Number( e.target.value ) } ); } } aria-label="Position de la coupe verticale" />
 							<span className="muet petit num">{ posCoupe }{ coupeV?.etat === 'erreur' ? ` · ${ coupeV.message }` : '' }</span>
+							<button type="button" className="bouton bouton-secondaire bouton-balayer" aria-pressed={ balayage } disabled={ reduit } data-testid="balayer-coupe"
+								title={ reduit ? 'Animations réduites : déplacer la coupe avec le curseur' : 'La coupe traverse le domaine' }
+								onClick={ () => setBalayage( ( b ) => ! b ) }>{ balayage ? '❚❚ Arrêter le balayage' : '▶ Balayer le domaine' }</button>
 						</>
 					) }
 				</fieldset>
@@ -641,11 +676,24 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 			<div className="scene-zone">
 				<div className="scene">
 					<canvas ref={ canvasRef } data-testid="scene-canvas" id="scene" />
-					<div className="scene-legende num" data-testid="scene-plan">
-						{ libellePlan } · exagération ×{ r.exageration }
-						{ r.instantane && r.instantane !== latestId ? ' · instantané historique' : '' }
+					<div className="scene-haut">
+						<div className="scene-legende num" data-testid="scene-plan">
+							{ libellePlan } · exagération ×{ r.exageration }
+							{ r.instantane && r.instantane !== latestId ? ' · instantané historique' : '' }
+						</div>
+						<div className="scene-vues" role="toolbar" aria-label="Caméra">
+							{ ( [ [ 'dessus', 'Dessus' ], [ 'sud', 'Sud' ], [ 'est', 'Est' ], [ 'iso', 'Iso' ] ] as const ).map( ( [ v, t ] ) => (
+								<button key={ v } type="button" onClick={ () => vue( v ) } title={ `Vue ${ t === 'Iso' ? 'isométrique' : t === 'Dessus' ? 'de dessus' : `depuis le ${ t.toLowerCase() }` }` } data-testid={ `vue-${ v }` }>{ t }</button>
+							) ) }
+							<span className="scene-vues-sep" aria-hidden="true" />
+							<button type="button" aria-pressed={ rotation } disabled={ reduit } onClick={ () => setRotation( ( x ) => ! x ) } title="Rotation automatique douce" data-testid="rotation-auto">⟳ Rotation</button>
+							<button type="button" aria-pressed={ voler } onClick={ () => setVoler( ( x ) => ! x ) } title="Approcher la caméra du point cliqué" data-testid="voler-clic">◎ Voler au clic</button>
+						</div>
 					</div>
-					{ messageScene && <div className="scene-message" data-testid="scene-message">{ messageScene }</div> }
+					<div className="scene-legende-verre">
+						<Legende coloration={ r.coloration } echelle={ ech } absente={ ! variablePubliee ? 'variable non publiée par ce modèle' : planOk && ! planOk.stats.valides ? 'non disponible (plan entièrement sous le relief)' : null } />
+					</div>
+					{ messageScene && <div className={ `scene-message${ messageScene === 'chargement…' ? ' en-chargement' : '' }` } data-testid="scene-message">{ messageScene === 'chargement…' ? <span className="rouet" aria-hidden="true" /> : null }{ messageScene }</div> }
 				</div>
 				<Frise
 					items={ items } erreur={ times.etat === 'erreur' ? times.message : null }

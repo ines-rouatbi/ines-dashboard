@@ -447,6 +447,38 @@ input[type="checkbox"], input[type="radio"] { width: 16px; height: 16px; accent-
 	background: rgba(18, 38, 58, .55); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, .12);
 	padding: 5px 10px; border-radius: 8px; pointer-events: none;
 }
+/* Commandes flottantes de la scène (UI v2) : vues de caméra, rotation, légende en verre dépoli. */
+.scene-haut { position: absolute; left: 10px; right: 10px; top: 10px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.scene-haut > * { pointer-events: auto; }
+.scene-haut .scene-legende { position: static; pointer-events: none; }
+.scene-vues {
+	display: flex; flex-wrap: nowrap; gap: 2px; align-items: center; margin-left: auto;
+	padding: 4px; border-radius: 10px; background: rgba(18, 38, 58, .55); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, .12);
+}
+.scene-vues button {
+	font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; color: rgba(255, 255, 255, .88); background: transparent; border: 0; border-radius: 7px;
+	padding: 4px 9px; cursor: pointer; transition: background .2s, color .2s;
+}
+.scene-vues button:hover:not(:disabled) { background: rgba(255, 255, 255, .12); color: #fff; }
+.scene-vues button[aria-pressed="true"] { background: #1E6FB8; color: #fff; }
+.scene-vues button:disabled { opacity: .45; cursor: not-allowed; }
+.scene-vues-sep { width: 1px; height: 18px; background: rgba(255, 255, 255, .2); margin: 0 2px; }
+.scene-legende-verre {
+	position: absolute; left: 10px; bottom: 10px; width: min(300px, calc(100% - 20px)); padding: 10px 12px 2px; border-radius: 12px;
+	background: rgba(255, 255, 255, .72); backdrop-filter: blur(12px) saturate(1.3); border: 1px solid rgba(255, 255, 255, .55);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, .25); color: #12263A; animation: apparait .5s .2s both;
+}
+.scene-legende-verre .legende { margin: 0 0 8px; }
+.scene-legende-verre .legende-titre, .scene-legende-verre .legende-graduations { color: #12263A; }
+.scene-legende-verre .legende-nd, .scene-legende-verre .legende-echelle, .scene-legende-verre .legende-classes { color: #3C5266; }
+[data-theme="dark"] .scene-legende-verre { background: rgba(19, 33, 47, .72); border-color: rgba(255, 255, 255, .12); color: #E4ECF2; }
+[data-theme="dark"] .scene-legende-verre .legende-titre, [data-theme="dark"] .scene-legende-verre .legende-graduations { color: #E4ECF2; }
+[data-theme="dark"] .scene-legende-verre .legende-nd, [data-theme="dark"] .scene-legende-verre .legende-echelle, [data-theme="dark"] .scene-legende-verre .legende-classes { color: #BCCAD6; }
+.scene-message.en-chargement { display: inline-flex; align-items: center; gap: 10px; }
+.rouet { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .25); border-top-color: #fff; animation: rouet .8s linear infinite; }
+@keyframes rouet { to { transform: rotate(360deg); } }
+.bouton-balayer { margin-top: 6px; width: 100%; }
+
 fieldset.champ { border: 0; padding: 0; margin: 0 0 16px; }
 fieldset.champ legend { padding: 0; margin-bottom: 7px; color: var(--encre-2); }
 .champ label.en-ligne, fieldset.champ > label { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
