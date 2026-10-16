@@ -19,6 +19,8 @@ import { texteCarteVide } from '../f3/Ensemble';
 import { chargerComparaison, chargerInstants, choixParDefaut, type Comparaison as Donnees } from './donnees';
 import '../f3/f3.css';
 
+const NATURE: Record<string, string> = { test: 'test', synthetique: 'synthétique', reel: 'réelle' };
+
 /** Hauteurs proposées (m au-dessus du sol) : celles de la vue d'ensemble et le moyeu par défaut (120 m). */
 export const HAUTEURS_COMPARAISON = [ ...new Set( [ ...HAUTEURS_SOL_M, 120 ] ) ].sort( ( x, y ) => x - y );
 
@@ -163,7 +165,7 @@ function Cartes( { d, memeInstant }: { d: Donnees; memeInstant: boolean } ) {
 						<dt>Plus forte baisse / hausse</dt><dd>{ signe( stats.minDiff ) } / { signe( stats.maxDiff ) }</dd>
 					</dl>
 					<p className="petit muet">
-						Nature des données : A { a.base.snapshot.versions.data_kind }, B { b.base.snapshot.versions.data_kind } ; modèle { a.base.snapshot.versions.model }.
+						Nature des données : A { NATURE[ a.base.snapshot.versions.data_kind ] ?? a.base.snapshot.versions.data_kind }, B { NATURE[ b.base.snapshot.versions.data_kind ] ?? b.base.snapshot.versions.data_kind } ; modèle { a.base.snapshot.versions.model }.
 					</p>
 					{ stats.communs ? (
 						<BoutonCsv testid="comparaison-export" nom={ nomFichier( a.base.snapshot.snapshot_id, 'vs', b.base.snapshot.snapshot_id, `${ hauteur }m-sol`, 'speed' ) }

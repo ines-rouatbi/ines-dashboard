@@ -96,6 +96,9 @@ function authorized( request, env ) {
 
 }
 
+// Variables null-ables obligatoires d'un niveau de /v1/column (contract/schemas/column.schema.json).
+const COLONNE_NULL = Object.freeze( { u: null, v: null, w: null, speed: null, sigma_speed: null, coverage: null, reliability: null, status: null } );
+
 // meta d'un modèle COMMITÉ. Immuable : mis en cache dans l'isolat.
 const metaCache = new Map();
 async function modelMeta( b, sha8 ) {
@@ -317,7 +320,9 @@ async function handleRead( request, env, parts, url ) {
 		const tb = await readRange( b, `models/${ sha8 }/terrain.f32`, idx * 4, 4 );
 		if ( ! tb ) return err( 404, 'absent', 'Relief incomplet.' );
 		const zt = new DataView( tb ).getFloat32( 0, true );
-		const levels = g.levels_asl_m.map( ( z ) => ( { z_asl_m: z, z_agl_m: z - zt, below_terrain: z - zt < g.min_agl_m } ) );
+		// Les variables obligatoires du schéma column (null-ables) sont présentes même quand le modèle ne les
+		// publie pas encore (M2 inactif : sigma_speed, coverage, reliability, status absents de meta.fields) : null.
+		const levels = g.levels_asl_m.map( ( z ) => ( { z_asl_m: z, z_agl_m: z - zt, below_terrain: z - zt < g.min_agl_m, ...COLONNE_NULL } ) );
 		let k0 = levels.findIndex( ( l ) => ! l.below_terrain );
 		if ( k0 < 0 ) k0 = nz;
 		const cols = await Promise.all( meta.fields.map( ( v ) => {

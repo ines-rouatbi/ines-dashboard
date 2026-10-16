@@ -379,6 +379,36 @@ describe.skipIf( ! existsSync( racine ) )( 'Worker /v1 (src/v1.js) sur faux R2',
 
 	} );
 
+	it( '/v1/column : variables non publiées par le modèle (M2 inactif) présentes à null, comme l’exige le schéma', async () => {
+
+		// Cas des vrais instantanés v7 publiés par M6 (lot F6) : meta.fields = u, v, w, speed.
+		const s = charger( 'normal' );
+		await deposer( env, s );
+		await commit( env, s );
+		const cle = `models/${ s.sha8 }/meta.json`, stocke = env.SNAPSHOTS.objets.get( cle )!;
+		const meta = JSON.parse( new TextDecoder().decode( stocke.octets ) );
+		meta.fields = [ 'u', 'v', 'w', 'speed' ];
+		env.SNAPSHOTS.objets.set( cle, { ...stocke, octets: new TextEncoder().encode( JSON.stringify( meta ) ) } );
+		vi.resetModules(); // cache des meta de l'isolat : module neuf
+		const { handleV1: frais } = await import( '../src/v1.js' );
+		const url = new URL( 'http://atom.local/v1/column/latest?i=10&j=10' );
+		const r = await frais( new Request( url ), env, url );
+		expect( r.status ).toBe( 200 );
+		const corps = await r.json() as { levels: Record<string, unknown>[] };
+		for ( const l of corps.levels ) {
+
+			for ( const v of [ 'sigma_speed', 'coverage', 'reliability', 'status' ] ) {
+
+				expect( l, v ).toHaveProperty( v );
+				expect( l[ v ] ).toBeNull();
+
+			}
+
+		}
+		expect( corps.levels.some( ( l ) => typeof l.speed === 'number' ) ).toBe( true );
+
+	} );
+
 	it( '/v1/column : 1 + len(meta.fields) lectures R2 au plus (< 50), valeurs identiques aux champs publiés', async () => {
 
 		const s = charger( 'normal' );
