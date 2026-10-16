@@ -9,10 +9,20 @@ import { expect, type Page } from '@playwright/test';
 export interface AtomTestApi {
 	ready: Promise<unknown>;
 	scene: unknown;
+	/** Niveau publié le plus proche de m mètres AU-DESSUS DE LA MER. */
 	setAltitude( m: number ): Promise<unknown> | unknown;
+	/** Plan à m mètres AU-DESSUS DU SOL (par colonne, relief du modèle ; F2). */
+	setHauteurSol?( m: number ): Promise<unknown> | unknown;
 	pick( x: number, y: number ): Promise<unknown> | unknown;
 	orbit?( deg: number ): Promise<unknown> | unknown;
+	/** F2 : réglages de la page (mode, coloration, coupes, couches…), résolue quand la scène les montre. */
+	regler?( r: Record<string, unknown> ): Promise<unknown>;
+	/** F2 : état observable de la scène (voir web/src/types/atom-hook.d.ts, AtomEtat). */
+	etat?(): any;
 }
+
+/** Page de la scène 3D (le crochet ne se résout que sur « Exploration 3D »). */
+export const SCENE_PATH = process.env.ATOM_SCENE_PATH ?? '/exploration';
 
 declare global {
 	interface Window { __atom?: AtomTestApi }
@@ -66,7 +76,7 @@ export function requireAtom( state: AtomState ) {
 /** Rectangle du canvas de la scène 3D. */
 export async function sceneBox( page: Page ) {
 
-	const canvas = page.locator( process.env.ATOM_CANVAS ?? 'canvas#scene, canvas[data-testid="scene"]' ).first();
+	const canvas = page.locator( process.env.ATOM_CANVAS ?? 'canvas#scene, canvas[data-testid="scene"], canvas[data-testid="scene-canvas"]' ).first();
 	await expect( canvas ).toBeVisible();
 	const box = await canvas.boundingBox();
 	if ( ! box ) throw new Error( 'canvas de la scène sans boîte englobante' );

@@ -1,0 +1,23 @@
+{
+  "model_sha8": "e44d68da",
+  "versions": {
+    "model": "fixture-test",
+    "model_sha256": "e44d68da25fe37103bcbc40f354411b81635a698e87e8eee1ffafac8f6e68348",
+    "norm": "70b219b3",
+    "data": "synthetique_contrat_v1",
+    "data_kind": "test",
+    "contract": "1.0"
+  },
+  "files": [
+    {
+      "path": "meta.json",
+      "sha256": "9773aafebe45c6ddd7fc3206590d6311b670e4fb2ad68413eb61e0a18388d1f6",
+      "bytes": 3645
+    },
+    {
+      "path": "terrain.f32",
+      "sha256": "c8f566c2bc534b2431637814598b7bd74e81f45ee46053a5ed074a2213f1f176",
+      "bytes": 20000
+    }
+  ]
+}

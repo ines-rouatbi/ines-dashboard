@@ -1,15 +1,15 @@
 {
   // Worker « atom.zelqane.com » — façade de PC-FNO3D (service vent 3D d'ines sur Colab).
-  // Il sert la viz three.js (statique), INJECTE la clé d'API lecture-seule côté serveur
+  // Il sert le front (Vite + React, build statique dans ./dist), INJECTE la clé d'API lecture-seule côté serveur
   // (le navigateur ne la voit jamais), et proxifie /api + /mcp vers le tunnel (atom-origin).
   "name": "atom-zelqane",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-20",
 
-  // La viz est servie depuis ./public. run_worker_first:true => le Worker décide pour CHAQUE
+  // Le front est servi depuis ./dist (npm run build). run_worker_first:true => le Worker décide pour CHAQUE
   // requête (api/mcp -> proxy ; reste -> assets), sinon les assets court-circuiteraient /api.
   "assets": {
-    "directory": "./public",
+    "directory": "./dist",
     "binding": "ASSETS",
     "run_worker_first": true,
     "not_found_handling": "single-page-application"
@@ -24,8 +24,19 @@
   "vars": {
     // Cible du tunnel nommé « atom » (connecteur sur le Colab d'ines).
     "ORIGIN": "https://atom-origin.zelqane.com"
-  }
+  },
 
+  // Instantanés publiés par le service PC-FNO3D (lot F1, contrat v1). Le tableau de bord ne lit que ça.
+  "r2_buckets": [
+    { "binding": "SNAPSHOTS", "bucket_name": "atom-snapshots" }
+  ]
+
+  // ATOM_ALLOW_TEST_SNAPSHOTS n'est volontairement PAS déclaré ici : sans lui, le Worker refuse tout
+  // instantané de test (versions.data_kind = "test"). En local seulement :
+  //   npx wrangler dev --var ATOM_ALLOW_TEST_SNAPSHOTS:1
+
+  // Secrets (jamais dans ce fichier) :
+  //   npx wrangler secret put PUBLISH_TOKEN      jeton de publication remis hors salon au service GPU
   // Secret (jamais dans ce fichier) : clé lecture-seule émise par le service d'ines.
   //   npx wrangler secret put PCFNO3D_READ_KEY
 }

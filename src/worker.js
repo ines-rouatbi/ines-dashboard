@@ -1,7 +1,7 @@
 // Worker atom.zelqane.com — façade de PC-FNO3D.
 //
 // Rôles :
-//   1. Servir la viz three.js (assets statiques dans ./public) à la racine.
+//   1. Servir le front (build Vite statique dans ./dist) à la racine.
 //   2. Proxifier /api/* et /mcp* vers le tunnel (ORIGIN = atom-origin.zelqane.com),
 //      en INJECTANT la clé d'API lecture-seule côté serveur (X-API-Key) : le navigateur
 //      ne porte jamais la clé.
@@ -11,6 +11,8 @@
 // Le service d'ines est sur un Colab éphémère : quand il dort, l'origine répond par une
 // erreur réseau (502/522). On la transforme en 503 JSON propre que la viz sait afficher
 // (« service endormi ») au lieu d'une page d'erreur Cloudflare.
+
+import { handleV1 } from './v1.js';
 
 const API_PREFIXES = [ '/api/', '/mcp' ];
 
@@ -98,6 +100,9 @@ export default {
 
 		const url = new URL( request.url );
 		const path = url.pathname;
+		// API /v1 du tableau de bord : instantanés publiés dans R2 (lecture) et publication par le service.
+		if ( path === '/v1' || path.startsWith( '/v1/' ) ) return handleV1( request, env, url );
+
 		const isApi = API_PREFIXES.some( ( p ) => path === p.replace( /\/$/, '' ) || path.startsWith( p ) );
 
 		if ( isApi ) {
@@ -113,7 +118,7 @@ export default {
 
 		}
 
-		// Tout le reste : la viz statique (SPA fallback géré par not_found_handling).
+		// Tout le reste : le front statique (repli SPA géré par not_found_handling).
 		return env.ASSETS.fetch( request );
 
 	},

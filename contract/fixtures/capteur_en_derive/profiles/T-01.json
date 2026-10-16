@@ -1,0 +1,261 @@
+{
+  "point_id": "T-01",
+  "i": 24,
+  "j": 16,
+  "x_m": 12000,
+  "y_m": 8000,
+  "z_terrain_m": 156.706,
+  "nearest_sensor": {
+    "id": "c240_160",
+    "distance_m": 0
+  },
+  "uncertainty": {
+    "method": "ensemble-masquage-v1",
+    "members": 8,
+    "calibrated": true,
+    "scale_factor": 1.3,
+    "coverage_80_validation": 0.81
+  },
+  "levels": [
+    {
+      "z_asl_m": 25,
+      "z_agl_m": -131.706,
+      "below_terrain": true,
+      "u": null,
+      "v": null,
+      "w": null,
+      "speed": null,
+      "sigma_speed": null,
+      "dir_from_deg": null,
+      "speed_interval": {
+        "p10": null,
+        "p50": null,
+        "p90": null
+      },
+      "status": null,
+      "coverage": null,
+      "reliability": null,
+      "reliability_class": null
+    },
+    {
+      "z_asl_m": 50,
+      "z_agl_m": -106.706,
+      "below_terrain": true,
+      "u": null,
+      "v": null,
+      "w": null,
+      "speed": null,
+      "sigma_speed": null,
+      "dir_from_deg": null,
+      "speed_interval": {
+        "p10": null,
+        "p50": null,
+        "p90": null
+      },
+      "status": null,
+      "coverage": null,
+      "reliability": null,
+      "reliability_class": null
+    },
+    {
+      "z_asl_m": 75,
+      "z_agl_m": -81.706,
+      "below_terrain": true,
+      "u": null,
+      "v": null,
+      "w": null,
+      "speed": null,
+      "sigma_speed": null,
+      "dir_from_deg": null,
+      "speed_interval": {
+        "p10": null,
+        "p50": null,
+        "p90": null
+      },
+      "status": null,
+      "coverage": null,
+      "reliability": null,
+      "reliability_class": null
+    },
+    {
+      "z_asl_m": 100,
+      "z_agl_m": -56.706,
+      "below_terrain": true,
+      "u": null,
+      "v": null,
+      "w": null,
+      "speed": null,
+      "sigma_speed": null,
+      "dir_from_deg": null,
+      "speed_interval": {
+        "p10": null,
+        "p50": null,
+        "p90": null
+      },
+      "status": null,
+      "coverage": null,
+      "reliability": null,
+      "reliability_class": null
+    },
+    {
+      "z_asl_m": 150,
+      "z_agl_m": -6.706,
+      "below_terrain": true,
+      "u": null,
+      "v": null,
+      "w": null,
+      "speed": null,
+      "sigma_speed": null,
+      "dir_from_deg": null,
+      "speed_interval": {
+        "p10": null,
+        "p50": null,
+        "p90": null
+      },
+      "status": null,
+      "coverage": null,
+      "reliability": null,
+      "reliability_class": null
+    },
+    {
+      "z_asl_m": 200,
+      "z_agl_m": 43.294,
+      "below_terrain": false,
+      "u": 8.537,
+      "v": -3.291,
+      "w": 0.015,
+      "speed": 9.149,
+      "sigma_speed": 0.196,
+      "dir_from_deg": 291.0799999999999,
+      "speed_interval": {
+        "p10": 8.898,
+        "p50": 9.149,
+        "p90": 9.4
+      },
+      "status": "estime",
+      "coverage": 0.9488,
+      "reliability": 0.8386,
+      "reliability_class": "elevee"
+    },
+    {
+      "z_asl_m": 300,
+      "z_agl_m": 143.294,
+      "below_terrain": false,
+      "u": 9.821,
+      "v": -4.287,
+      "w": 0.011,
+      "speed": 10.716,
+      "sigma_speed": 0.299,
+      "dir_from_deg": 293.5799999999999,
+      "speed_interval": {
+        "p10": 10.333,
+        "p50": 10.716,
+        "p90": 11.099
+      },
+      "status": "estime",
+      "coverage": 0.8346,
+      "reliability": 0.752,
+      "reliability_class": "elevee"
+    },
+    {
+      "z_asl_m": 400,
+      "z_agl_m": 243.294,
+      "below_terrain": false,
+      "u": 10.173,
+      "v": -4.98,
+      "w": 0.008,
+      "speed": 11.326,
+      "sigma_speed": 0.387,
+      "dir_from_deg": 296.0799999999999,
+      "speed_interval": {
+        "p10": 10.83,
+        "p50": 11.326,
+        "p90": 11.822
+      },
+      "status": "estime",
+      "coverage": 0.7362,
+      "reliability": 0.6772,
+      "reliability_class": "moyenne"
+    },
+    {
+      "z_asl_m": 500,
+      "z_agl_m": 343.294,
+      "below_terrain": false,
+      "u": 10.281,
+      "v": -5.601,
+      "w": 0.006,
+      "speed": 11.707,
+      "sigma_speed": 0.465,
+      "dir_from_deg": 298.5799999999999,
+      "speed_interval": {
+        "p10": 11.111,
+        "p50": 11.707,
+        "p90": 12.303
+      },
+      "status": "estime",
+      "coverage": 0.6496,
+      "reliability": 0.6102,
+      "reliability_class": "moyenne"
+    },
+    {
+      "z_asl_m": 650,
+      "z_agl_m": 493.294,
+      "below_terrain": false,
+      "u": 10.236,
+      "v": -6.479,
+      "w": 0.003,
+      "speed": 12.114,
+      "sigma_speed": 0.565,
+      "dir_from_deg": 302.3299999999999,
+      "speed_interval": {
+        "p10": 11.39,
+        "p50": 12.114,
+        "p90": 12.838
+      },
+      "status": "estime",
+      "coverage": 0.5394,
+      "reliability": 0.5315,
+      "reliability_class": "moyenne"
+    },
+    {
+      "z_asl_m": 800,
+      "z_agl_m": 643.294,
+      "below_terrain": false,
+      "u": 10.044,
+      "v": -7.319,
+      "w": 0.002,
+      "speed": 12.428,
+      "sigma_speed": 0.646,
+      "dir_from_deg": 306.0799999999999,
+      "speed_interval": {
+        "p10": 11.6,
+        "p50": 12.428,
+        "p90": 13.256
+      },
+      "status": "estime",
+      "coverage": 0.4488,
+      "reliability": 0.4606,
+      "reliability_class": "faible"
+    },
+    {
+      "z_asl_m": 1000,
+      "z_agl_m": 843.294,
+      "below_terrain": false,
+      "u": 9.623,
+      "v": -8.39,
+      "w": 0.001,
+      "speed": 12.767,
+      "sigma_speed": 0.735,
+      "dir_from_deg": 311.0799999999999,
+      "speed_interval": {
+        "p10": 11.825,
+        "p50": 12.767,
+        "p90": 13.709
+      },
+      "status": "estime",
+      "coverage": 0.3504,
+      "reliability": 0.3898,
+      "reliability_class": "faible"
+    }
+  ]
+}

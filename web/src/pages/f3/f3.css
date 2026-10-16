@@ -1,0 +1,104 @@
+/* Pages du lot F3 (Vue d'ensemble, Fiabilité, Modèle) sur la charte de theme.css (§17.4). */
+
+.f3-page { padding: 16px 20px 32px; display: flex; flex-direction: column; gap: 14px; max-width: 1600px; }
+.f3-page h1 { margin: 0; font-size: 22px; }
+.f3-page h2 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--encre-2); }
+.f3-page h3 { margin: 14px 0 6px; font-size: 13px; color: var(--encre-2); }
+.f3-page p { margin: 4px 0; }
+.f3-page code { font-size: 12px; }
+.f3-entete p { margin-top: 2px; }
+
+.f3-bloc, .f3-carte-bloc { background: var(--panneau); border-radius: var(--rayon); box-shadow: var(--ombre); padding: 14px 16px; min-width: 0; }
+.f3-grille-principale { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; align-items: start; }
+.f3-colonne { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.f3-grille-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; align-items: start; }
+@media (max-width: 1100px) { .f3-grille-principale { grid-template-columns: minmax(0, 1fr); } }
+
+/* Indicateurs clés */
+.f3-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.f3-kpi { background: var(--panneau); border-radius: var(--rayon); box-shadow: var(--ombre); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.f3-kpi-valeur { font-size: 22px; font-weight: 700; }
+.f3-kpi-na .f3-kpi-valeur { font-size: 15px; font-weight: 500; color: var(--encre-3); }
+.f3-kpi-libelle { color: var(--encre-2); font-size: 12px; }
+.f3-kpi-detail { color: var(--encre-3); font-size: 11px; }
+
+/* Cartes */
+.f3-cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px 16px; margin-top: 10px; }
+.f3-cartes-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.f3-carte { margin: 0; }
+.f3-carte figcaption { margin-bottom: 4px; }
+.f3-carte-cadre {
+	position: relative; width: 100%; border: 1px solid var(--trait); border-radius: 4px; overflow: hidden;
+	background: repeating-linear-gradient(45deg, #EEF1F3 0 4px, #DCE2E7 4px 5px);
+}
+.f3-carte-cadre canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.f3-carte-vide { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; color: var(--encre-2); font-weight: 500; background: rgba(255, 255, 255, .55); }
+.f3-infobulle { position: absolute; transform: translate(-50%, calc(-100% - 10px)); background: var(--encre); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 6px; white-space: nowrap; pointer-events: none; z-index: 2; font-variant-numeric: tabular-nums; }
+.f3-nord { position: absolute; top: 4px; right: 6px; font-size: 11px; font-weight: 700; color: var(--encre); background: rgba(255, 255, 255, .8); padding: 0 4px; border-radius: 3px; }
+.f3-carte-resume { color: var(--encre-2); font-variant-numeric: tabular-nums; }
+.f3-carte-axes { margin-top: 0; }
+
+/* Capteurs : forme + couleur d'état, anneau clair sur le raster */
+.f3-capteur { position: absolute; width: 11px; height: 11px; transform: translate(-50%, -50%); background: var(--c); box-shadow: 0 0 0 2px #fff; z-index: 1; }
+.f3-capteur-legende { position: relative; display: inline-block; transform: none; margin-right: 4px; vertical-align: middle; }
+.f3-forme-rond { border-radius: 50%; }
+.f3-forme-carre { border-radius: 1px; }
+.f3-forme-losange { transform: translate(-50%, -50%) rotate(45deg); }
+.f3-capteur-legende.f3-forme-losange { transform: rotate(45deg); }
+.f3-forme-triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); box-shadow: none; width: 13px; height: 13px; filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
+.f3-forme-croix { clip-path: polygon(20% 0, 50% 30%, 80% 0, 100% 20%, 70% 50%, 100% 80%, 80% 100%, 50% 70%, 20% 100%, 0 80%, 30% 50%, 0 20%); box-shadow: none; width: 13px; height: 13px; filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
+
+/* Légendes */
+.f3-legende { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 6px 0; font-size: 12px; color: var(--encre-2); }
+.f3-legende-titre { font-weight: 600; color: var(--encre); }
+.f3-legende-item { display: inline-flex; align-items: center; gap: 5px; }
+.f3-legende-item > i { display: inline-block; width: 14px; height: 10px; border-radius: 2px; }
+.f3-legende-barre { display: inline-flex; flex-direction: column; gap: 2px; min-width: 220px; }
+.f3-legende-barre > i { display: block; height: 10px; border-radius: 2px; }
+.f3-legende-ticks { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+.f3-hachure { background: repeating-linear-gradient(45deg, #EEF1F3 0 3px, #B9C3CB 3px 4px); border: 1px solid var(--trait); }
+
+/* Graphiques et tableaux */
+.f3-graphique { width: 100%; height: 280px; }
+.f3-graphique-haut { height: 360px; }
+.f3-tableau-repli summary { cursor: pointer; color: var(--accent-texte); font-size: 12px; margin-top: 6px; }
+.f3-defile { overflow-x: auto; }
+.f3-table { border-collapse: collapse; width: 100%; font-size: 12px; margin-top: 6px; }
+.f3-table th, .f3-table td { padding: 4px 8px; border-bottom: 1px solid var(--trait); text-align: left; }
+.f3-table th { color: var(--encre-2); font-weight: 600; }
+.f3-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.f3-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; }
+.f3-kv dt { color: var(--encre-3); }
+.f3-kv dd { margin: 0; overflow-wrap: anywhere; }
+.f3-hash { font-size: 11px; }
+
+.f3-controles { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; margin-bottom: 6px; }
+.f3-boutons { display: inline-flex; gap: 4px; }
+.f3-boutons button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--trait); background: var(--panneau); color: var(--encre); cursor: pointer; }
+.f3-boutons button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.f3-controles select { font: inherit; padding: 3px 6px; }
+
+/* Alertes (TB3) */
+.f3-alertes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.f3-alerte { border-left: 4px solid var(--trait); padding: 4px 8px; background: #F6F8F9; border-radius: 4px; }
+.f3-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 0 5px; border-radius: 3px; border: 1px solid currentColor; }
+.f3-niveau-critique { border-left-color: #7A1F17; } .f3-niveau-critique .f3-badge { color: #7A1F17; }
+.f3-niveau-important { border-left-color: var(--alerte); } .f3-niveau-important .f3-badge { color: var(--alerte-texte); }
+.f3-niveau-avertissement { border-left-color: var(--attention); } .f3-niveau-avertissement .f3-badge { color: var(--attention-texte); }
+.f3-niveau-information { border-left-color: var(--accent); } .f3-niveau-information .f3-badge { color: var(--accent-texte); }
+
+.f3-erreur { color: var(--alerte-texte); }
+.f3-avertissement { background: #FBF3E6; border: 1px solid #E6D3B3; color: #6A4E22; border-radius: 6px; padding: 6px 10px; font-weight: 500; }
+
+/* Simulation (TB6) : jamais confondue avec l'état courant */
+.f3-simulation { border: 2px dashed #8a6100; border-radius: 8px; padding: 10px 12px; background: #FFFBF0; }
+.f3-etiquette-sim { display: inline-block; font-weight: 800; letter-spacing: 1px; color: #fff; background: #8a6100; padding: 2px 10px; border-radius: 4px; margin: 0 0 8px; }
+
+.f3-vis1 { margin-top: 0; }
+.f3-na { color: var(--encre-2); background: var(--fond); border: 1px dashed var(--trait); border-radius: 8px; padding: 12px; margin: 0; }
+
+/* Comparaison de deux instants (lot F6) */
+.comparaison-controles { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }
+.comparaison-choix { display: flex; flex-direction: column; gap: 4px; color: var(--encre-2); font-size: 12px; }
+.comparaison-choix select { max-width: 100%; font-size: 13px; }

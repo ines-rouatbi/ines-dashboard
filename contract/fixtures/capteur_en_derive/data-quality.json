@@ -1,0 +1,40 @@
+{
+  "period": {
+    "from": "2025-01-12T11:50:00Z",
+    "to": "2025-01-12T12:00:00Z"
+  },
+  "files": {
+    "received": 6,
+    "accepted": 5,
+    "rejected": 1,
+    "quarantined": 0
+  },
+  "sensors": {
+    "total": 486581,
+    "observed": 480741,
+    "interpolated": 5839,
+    "muette": 1,
+    "exclue": 0
+  },
+  "interpolated_fraction": 0.012,
+  "issues": [
+    {
+      "kind": "valeur_interpolee",
+      "target": "treillis",
+      "count": 5839,
+      "detail": "Capteurs sans mesure directe, interpolés (source_type)"
+    },
+    {
+      "kind": "capteur_muet",
+      "target": "c880_420",
+      "count": 1,
+      "detail": "Aucune mesure depuis 09:40"
+    },
+    {
+      "kind": "fichier_rejete",
+      "target": "aneo_2025-01-12T1150.csv",
+      "count": 1,
+      "detail": "Horodatage hors période"
+    }
+  ]
+}

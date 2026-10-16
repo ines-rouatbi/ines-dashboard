@@ -1,0 +1,29 @@
+# Intégration continue du tableau de bord : types, tests, build, contrat.
+name: ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  front:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm run contract:check
+      # Test négatif du validateur du contrat (3 défauts injectés → code 1, 3 messages).
+      - run: npm run contract:negative
+      # Carte Tunisie : tests node:test de web/src/geo/tunisia.ts et des fichiers web/public/geo/.
+      - run: npm run geo:test

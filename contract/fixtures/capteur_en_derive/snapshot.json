@@ -1,0 +1,99 @@
+{
+  "snapshot_id": "test_capteur_en_derive_e44d68da",
+  "valid_time": "2025-01-12T12:00:00Z",
+  "versions": {
+    "model": "fixture-test",
+    "model_sha256": "e44d68da25fe37103bcbc40f354411b81635a698e87e8eee1ffafac8f6e68348",
+    "norm": "70b219b3",
+    "data": "synthetique_contrat_v1",
+    "data_kind": "test",
+    "contract": "1.0"
+  },
+  "network": {
+    "kind": "treillis_synthetique",
+    "sensors_total": 486581,
+    "sensors_visible": 486580,
+    "unit": "capteur"
+  },
+  "kpi": {
+    "share_high_reliability": 0.339,
+    "reconstruction_ms": 91,
+    "open_alerts": {
+      "information": 1,
+      "avertissement": 1,
+      "important": 1,
+      "critique": 0
+    },
+    "hub_wind_mean_ms": 10.33,
+    "hub_wind_max_ms": 11.9,
+    "hub_height_agl_m": 120
+  },
+  "physics": {
+    "mass_residual_rms": 0.000026,
+    "mass_residual_p95": 0.0000597,
+    "mass_residual_ok": true,
+    "ground_condition_rms_ms": 0.004,
+    "rho_source": "atmosphere_standard"
+  },
+  "stations_summary": {
+    "active": 486579,
+    "suspecte": 0,
+    "muette": 1,
+    "derive": 1,
+    "exclue": 0
+  },
+  "scenario": null,
+  "points": [
+    {
+      "id": "T-01",
+      "kind": "eolienne",
+      "name": "Éolienne virtuelle 1",
+      "x_m": 12000,
+      "y_m": 8000,
+      "profile": true,
+      "windrose": true
+    },
+    {
+      "id": "T-02",
+      "kind": "eolienne",
+      "name": "Éolienne virtuelle 2",
+      "x_m": 14500,
+      "y_m": 9500,
+      "profile": true,
+      "windrose": false
+    },
+    {
+      "id": "T-03",
+      "kind": "eolienne",
+      "name": "Éolienne virtuelle 3",
+      "x_m": 30000,
+      "y_m": 15000,
+      "profile": true,
+      "windrose": false
+    },
+    {
+      "id": "S-01",
+      "kind": "site",
+      "name": "Site candidat nord-est",
+      "x_m": 44000,
+      "y_m": 21000,
+      "profile": true,
+      "windrose": true
+    }
+  ],
+  "assets": {
+    "meta": "/v1/meta/e44d68da",
+    "terrain": "/v1/terrain/e44d68da",
+    "fields_template": "/v1/fields/test_capteur_en_derive_e44d68da/{level}/{var}",
+    "column_template": "/v1/column/test_capteur_en_derive_e44d68da?i={i}&j={j}",
+    "profile_template": "/v1/profiles/test_capteur_en_derive_e44d68da/{point_id}",
+    "windrose_template": "/v1/windrose/{site_id}?snapshot=test_capteur_en_derive_e44d68da",
+    "quality": "/v1/quality/test_capteur_en_derive_e44d68da",
+    "alerts": "/v1/alerts/test_capteur_en_derive_e44d68da",
+    "stations": "/v1/stations/test_capteur_en_derive_e44d68da",
+    "wind_farm": "/v1/wind-farm/test_capteur_en_derive_e44d68da",
+    "data_quality": "/v1/data-quality/test_capteur_en_derive_e44d68da",
+    "export_netcdf": null,
+    "export_csv": null
+  }
+}

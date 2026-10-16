@@ -1,0 +1,11 @@
+{
+  "total": 1,
+  "next": null,
+  "items": [
+    {
+      "snapshot_id": "test_capteur_en_derive_e44d68da",
+      "valid_time": "2025-01-12T12:00:00Z",
+      "open_alerts": 3
+    }
+  ]
+}
