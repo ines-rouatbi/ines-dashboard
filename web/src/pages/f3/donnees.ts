@@ -146,11 +146,16 @@ export interface PointMoyeu {
 	moyenne: number | null;
 	max: number | null;
 	hauteur: number | null;
+	/** Autres indicateurs publiés de l'instantané (tendances de la Vue d'ensemble, UI v2) ; null = non disponible. */
+	fiabilite?: number | null;
+	reconstruction_ms?: number | null;
+	alertes?: number | null;
+	capteurs?: number | null;
 	/** Raison de l'absence de l'instantané (erreur de chargement). */
 	erreur?: string;
 }
 
-export function pointMoyeu( item: Pick<TimeItem, 'snapshot_id' | 'valid_time'>, snap: Pick<Snapshot, 'kpi'> | null, erreur?: string ): PointMoyeu {
+export function pointMoyeu( item: Pick<TimeItem, 'snapshot_id' | 'valid_time'>, snap: Pick<Snapshot, 'kpi'> & Partial<Pick<Snapshot, 'network'>> | null, erreur?: string ): PointMoyeu {
 
 	const k = snap?.kpi;
 	return {
@@ -159,6 +164,10 @@ export function pointMoyeu( item: Pick<TimeItem, 'snapshot_id' | 'valid_time'>, 
 		moyenne: k?.hub_wind_mean_ms ?? null,
 		max: k?.hub_wind_max_ms ?? null,
 		hauteur: k?.hub_height_agl_m ?? null,
+		fiabilite: k?.share_high_reliability ?? null,
+		reconstruction_ms: k?.reconstruction_ms ?? null,
+		alertes: k?.open_alerts ? k.open_alerts.critique + k.open_alerts.important + k.open_alerts.avertissement + k.open_alerts.information : null,
+		capteurs: snap && 'network' in snap ? ( snap as Pick<Snapshot, 'network'> ).network.sensors_visible : null,
 		...( erreur ? { erreur } : {} ),
 	};
 

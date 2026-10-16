@@ -13,7 +13,7 @@ import { ALERT_LEVEL, NA, num, utc, withUnit } from '../shared/format';
 import { AvecRessource, EtatPageF3, Kpi, cacheChamps, oui, pourcent, scientifique, useAsync, useInstantane } from './commun';
 import { Carte, Legende, LegendeCapteurs, bornesEchelle, type Echelle } from './Carte';
 import { RAMPE_VITESSE } from './couleurs';
-import { chargerBase, chargerCartes, chargerSerie, exportCarte, type Base, type CarteSol } from './donnees';
+import { chargerBase, chargerCartes, chargerSerie, exportCarte, type Base, type CarteSol, type PointMoyeu } from './donnees';
 import { ExportsPublies } from '../../ui/Exports';
 import { SerieMoyeu } from './graphiques';
 import { CarteVivante } from './CarteVivante';
@@ -87,7 +87,7 @@ function Ensemble( { snapshot, latest, jeton }: { snapshot: Snapshot; latest: La
 				<ExportsPublies snapshot={ snapshot } />
 			</header>
 
-			<Indicateurs snapshot={ snapshot } />
+			<Indicateurs snapshot={ snapshot } serie={ serie.etat === 'ok' ? serie.val.points : null } />
 
 			{ /* Carte animée : montée une fois les 4 cartes chargées (n'entre pas dans la mesure VIS1). */ }
 			{ b && cartes.etat === 'ok' ? <CarteVivante base={ b } />
@@ -137,22 +137,30 @@ function Ensemble( { snapshot, latest, jeton }: { snapshot: Snapshot; latest: La
 
 }
 
-export function Indicateurs( { snapshot }: { snapshot: Snapshot } ) {
+export function Indicateurs( { snapshot, serie = null }: { snapshot: Snapshot; serie?: PointMoyeu[] | null } ) {
 
 	const k = snapshot.kpi, n = snapshot.network;
 	const oa = k.open_alerts;
 	const totalAlertes = oa ? oa.critique + oa.important + oa.avertissement + oa.information : null;
 	const h = `${ num( k.hub_height_agl_m ) } m au-dessus du sol`;
+	// Tendances sur les instants publiés (série au moyeu) : null = trou, jamais 0.
+	const s = ( f: ( p: PointMoyeu ) => number | null | undefined ) => ( serie && serie.length > 1 ? serie.map( ( p ) => f( p ) ?? null ) : null );
 	return (
 		<section className="f3-kpis" aria-label="Indicateurs clés de l'instantané" data-testid="kpis">
-			<Kpi testid="kpi-hub-mean" valeur={ withUnit( k.hub_wind_mean_ms, 'm/s', 1 ) } libelle={ `Vent moyen à ${ h }` } detail="sur le domaine" />
-			<Kpi testid="kpi-hub-max" valeur={ withUnit( k.hub_wind_max_ms, 'm/s', 1 ) } libelle={ `Vent maximal à ${ h }` } detail="sur le domaine" />
-			<Kpi testid="kpi-fiabilite" valeur={ pourcent( k.share_high_reliability ) } libelle="Nœuds en fiabilité élevée" />
-			<Kpi testid="kpi-alertes" valeur={ num( totalAlertes ) } libelle="Alertes ouvertes"
+			<Kpi rang={ 0 } testid="kpi-hub-mean" valeur={ withUnit( k.hub_wind_mean_ms, 'm/s', 1 ) } libelle={ `Vent moyen à ${ h }` } detail="sur le domaine"
+				nombre={ { v: k.hub_wind_mean_ms, format: ( x ) => withUnit( x, 'm/s', 1 ) } } serie={ s( ( p ) => p.moyenne ) } />
+			<Kpi rang={ 1 } testid="kpi-hub-max" valeur={ withUnit( k.hub_wind_max_ms, 'm/s', 1 ) } libelle={ `Vent maximal à ${ h }` } detail="sur le domaine"
+				nombre={ { v: k.hub_wind_max_ms, format: ( x ) => withUnit( x, 'm/s', 1 ) } } serie={ s( ( p ) => p.max ) } />
+			<Kpi rang={ 2 } testid="kpi-fiabilite" valeur={ pourcent( k.share_high_reliability ) } libelle="Nœuds en fiabilité élevée"
+				nombre={ { v: k.share_high_reliability, format: ( x ) => pourcent( x ) } } serie={ s( ( p ) => p.fiabilite ) } />
+			<Kpi rang={ 3 } testid="kpi-alertes" valeur={ num( totalAlertes ) } libelle="Alertes ouvertes"
+				nombre={ { v: totalAlertes, format: ( x ) => num( Math.round( x ) ) } } serie={ s( ( p ) => p.alertes ) }
 				detail={ oa ? `${ oa.critique } crit. · ${ oa.important } imp. · ${ oa.avertissement } av. · ${ oa.information } info.` : undefined } />
-			<Kpi testid="kpi-capteurs" valeur={ `${ num( n.sensors_visible ) } / ${ num( n.sensors_total ) }` } libelle="Capteurs visibles / total"
+			<Kpi rang={ 4 } testid="kpi-capteurs" valeur={ `${ num( n.sensors_visible ) } / ${ num( n.sensors_total ) }` } libelle="Capteurs visibles / total"
+				nombre={ { v: n.sensors_visible, format: ( x ) => `${ num( Math.round( x ) ) } / ${ num( n.sensors_total ) }` } } serie={ s( ( p ) => p.capteurs ) }
 				detail={ n.kind === 'treillis_synthetique' ? 'treillis synthétique' : 'stations ANEO' } />
-			<Kpi testid="kpi-reconstruction" valeur={ withUnit( k.reconstruction_ms, 'ms' ) } libelle="Temps de reconstruction" />
+			<Kpi rang={ 5 } testid="kpi-reconstruction" valeur={ withUnit( k.reconstruction_ms, 'ms' ) } libelle="Temps de reconstruction"
+				nombre={ { v: k.reconstruction_ms, format: ( x ) => withUnit( x, 'ms' ) } } serie={ s( ( p ) => p.reconstruction_ms ) } />
 		</section>
 	);
 

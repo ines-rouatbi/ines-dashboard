@@ -1,12 +1,13 @@
 // Briques communes des pages F3 : chargement asynchrone, état d'une ressource, valeurs « non disponible ».
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { api, CacheChamps, libelleErreur } from '../../data';
 import type { Snapshot } from '../../data/contract';
 import type { EtatLatest } from '../../ui/useLatest';
 import { NA } from '../shared/format';
 import type { Ressource } from './donnees';
 import { SquelettePage } from '../../ui/Squelette';
+import { Compteur, Sparkline } from '../../ui/Compteur';
 import './f3.css';
 
 /** Cache des champs de l'instantané courant, partagé par la Vue d'ensemble et la page Fiabilité. */
@@ -66,14 +67,25 @@ export function AvecRessource<T>( { r, quoi, children }: { r: Ressource<T>; quoi
 
 }
 
-/** Indicateur clé : valeur (déjà formatée, « non disponible » si inconnue) et libellé. */
-export function Kpi( { valeur, libelle, detail, testid }: { valeur: string; libelle: string; detail?: ReactNode; testid: string } ) {
+/**
+ * Indicateur clé : valeur (déjà formatée, « non disponible » si inconnue) et libellé. UI v2 : `nombre` anime la
+ * valeur (compteur, la valeur finale reste dans le DOM) et `serie` ajoute la tendance sur les instants publiés.
+ */
+export function Kpi( { valeur, libelle, detail, testid, nombre, serie, rang = 0 }: {
+	valeur: string; libelle: string; detail?: ReactNode; testid: string;
+	nombre?: { v: number | null; format: ( x: number ) => string };
+	serie?: ( number | null )[] | null;
+	rang?: number;
+} ) {
 
 	return (
-		<div className={ `f3-kpi${ valeur === NA ? ' f3-kpi-na' : '' }` } data-testid={ testid }>
-			<span className="f3-kpi-valeur" data-testid={ `${ testid }-valeur` }>{ valeur }</span>
+		<div className={ `f3-kpi apparait${ valeur === NA ? ' f3-kpi-na' : '' }` } data-testid={ testid } style={ { '--i': rang } as CSSProperties }>
+			{ nombre && valeur !== NA
+				? <Compteur valeur={ nombre.v } format={ nombre.format } className="f3-kpi-valeur" testid={ `${ testid }-valeur` } />
+				: <span className="f3-kpi-valeur" data-testid={ `${ testid }-valeur` }>{ valeur }</span> }
 			<span className="f3-kpi-libelle">{ libelle }</span>
 			{ detail ? <span className="f3-kpi-detail">{ detail }</span> : null }
+			{ serie && serie.length > 1 ? <Sparkline valeurs={ serie } titre={ `${ libelle } : tendance sur ${ serie.length } instants publiés` } /> : null }
 		</div>
 	);
 

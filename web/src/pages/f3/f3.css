@@ -16,8 +16,15 @@
 
 /* Indicateurs clés */
 .f3-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
-.f3-kpi { background: var(--panneau); border-radius: var(--rayon); box-shadow: var(--ombre); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
-.f3-kpi-valeur { font-size: 22px; font-weight: 700; }
+.f3-kpi {
+	position: relative; overflow: hidden;
+	background: var(--panneau); border: 1px solid var(--trait); border-radius: var(--rayon); box-shadow: var(--ombre); padding: 12px 14px 8px;
+	display: flex; flex-direction: column; gap: 2px; transition: transform .2s ease, box-shadow .2s ease;
+}
+.f3-kpi:hover { transform: translateY(-2px); box-shadow: var(--ombre-forte); }
+.f3-kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: linear-gradient(180deg, var(--accent), var(--sable)); opacity: .8; }
+.f3-kpi-valeur { font-size: 24px; font-weight: 700; letter-spacing: -.2px; font-variant-numeric: tabular-nums; }
+.f3-kpi .sparkline { margin-top: auto; padding-top: 6px; }
 .f3-kpi-na .f3-kpi-valeur { font-size: 15px; font-weight: 500; color: var(--encre-3); }
 .f3-kpi-libelle { color: var(--encre-2); font-size: 12px; }
 .f3-kpi-detail { color: var(--encre-3); font-size: 11px; }
