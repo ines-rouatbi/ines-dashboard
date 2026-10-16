@@ -451,7 +451,7 @@ describe.skipIf( ! existsSync( racine ) )( 'Worker /v1 (src/v1.js) sur faux R2',
 
 		}
 
-	} );
+	}, 30_000 ); // 5 colonnes × 12 niveaux × toutes les variables : ~3 s seul, bien plus quand toute la suite tourne en parallèle
 
 	it( 'erreur interne : message générique avec référence, détail seulement dans le journal', async () => {
 
