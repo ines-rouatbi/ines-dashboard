@@ -38,7 +38,9 @@ const SHA8_RE = /^[0-9a-f]{8}$/;
 const POINT_RE = /^[A-Za-z0-9_-]+$/;
 const PATH_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]*(\/[A-Za-z0-9][A-Za-z0-9_.-]*)*$/;
 const DATA_STATUS = new Set( [ 'complete', 'degrade' ] );
-const IMMUTABLE = 'public, max-age=31536000, immutable';
+// Instantané publié : mis en cache mais revalidé (ETag → 304). Pas « immutable » : la fiabilité
+// asynchrone (décision 2026-10-16) complète un instantané après sa première publication, sous le même id.
+const IMMUTABLE = 'public, no-cache';
 const JSON_TYPE = 'application/json; charset=utf-8';
 
 // Ressources JSON d'un instantané : /v1/<ressource>/<id> → snapshots/<id>/<fichier>.
@@ -297,7 +299,7 @@ async function handleRead( request, env, parts, url ) {
 		return new Response( o.body, { headers: {
 			'content-type': 'application/octet-stream', 'content-length': String( size ),
 			'x-atom-dtype': enc.dtype, 'access-control-expose-headers': 'x-atom-dtype',
-			'cache-control': s.immutable ? IMMUTABLE : 'no-store',
+			'cache-control': s.immutable ? IMMUTABLE : 'no-store', etag: o.httpEtag,
 		} } );
 
 	}
@@ -587,6 +589,19 @@ async function handlePublish( request, env, parts ) {
 
 }
 
+// If-None-Match identique à l'ETag d'une réponse 200 → 304 sans corps (revalidation du cache).
+function notModified( request, res ) {
+
+	const etag = res.headers.get( 'etag' ), inm = request.headers.get( 'if-none-match' );
+	if ( res.status !== 200 || ! etag || ! inm ) return res;
+	const strip = ( t ) => t.trim().replace( /^W\//, '' );
+	if ( ! inm.split( ',' ).some( ( t ) => t.trim() === '*' || strip( t ) === strip( etag ) ) ) return res;
+	const h = new Headers( res.headers );
+	h.delete( 'content-length' );
+	return new Response( null, { status: 304, headers: h } );
+
+}
+
 export async function handleV1( request, env, url ) {
 
 	if ( ! env.SNAPSHOTS ) return err( 503, 'r2_absent', 'Binding SNAPSHOTS non configuré.' );
@@ -595,7 +610,7 @@ export async function handleV1( request, env, url ) {
 		const parts = url.pathname.replace( /^\/v1\/?/, '' ).split( '/' ).filter( Boolean ).map( decodeURIComponent );
 		if ( parts[ 0 ] === 'publish' || ( parts[ 0 ] === 'heartbeat' && request.method === 'POST' ) ) return await handlePublish( request, env, parts );
 		if ( request.method !== 'GET' && request.method !== 'HEAD' ) return err( 405, 'methode', 'Lecture seule.' );
-		return await handleRead( request, env, parts, url );
+		return notModified( request, await handleRead( request, env, parts, url ) );
 
 	} catch ( e ) {
 

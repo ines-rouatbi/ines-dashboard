@@ -23,7 +23,7 @@ components:
     filePath: { name: path, in: path, required: true, schema: { type: string }, description: "Chemin relatif encodé (encodeURIComponent : « / » → %2F) ; le Worker accepte aussi les « / » bruts" }
     sha256Header: { name: X-Content-SHA256, in: header, required: true, schema: { type: string, pattern: "^[0-9a-f]{64}$" } }
   headers:
-    immutable: { schema: { type: string }, description: "public, max-age=31536000, immutable (sauf id = latest : no-store)" }
+    immutable: { schema: { type: string }, description: "public, no-cache + ETag, revalidation If-None-Match → 304 (sauf id = latest : no-store). Pas immutable : la fiabilité asynchrone complète un instantané après publication (rev. 2026-10-16)" }
   responses:
     notFound: { description: Inconnu, content: { application/json: { schema: { type: object, properties: { error: { type: string }, message: { type: string } } } } } }
 paths:
