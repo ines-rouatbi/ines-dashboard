@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 
-export type PageId = 'ensemble' | 'exploration' | 'fiabilite' | 'eolien' | 'alertes' | 'modele';
+export type PageId = 'ensemble' | 'exploration' | 'comparaison' | 'fiabilite' | 'eolien' | 'alertes' | 'modele';
 
 export interface Route { id: PageId; chemin: string; titre: string }
 
 export const ROUTES: Route[] = [
 	{ id: 'ensemble', chemin: '/', titre: 'Vue d\'ensemble' },
 	{ id: 'exploration', chemin: '/exploration', titre: 'Exploration 3D' },
+	{ id: 'comparaison', chemin: '/comparaison', titre: 'Comparaison' },
 	{ id: 'fiabilite', chemin: '/fiabilite', titre: 'Fiabilité' },
 	{ id: 'eolien', chemin: '/eolien', titre: 'Éolien' },
 	{ id: 'alertes', chemin: '/alertes', titre: 'Alertes' },

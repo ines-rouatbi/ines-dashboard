@@ -6,6 +6,7 @@ import { texteBandeau } from '../domain/freshness';
 import { Exploration } from '../pages/Exploration';
 import { Alertes, Eolien } from '../pages/F4';
 import { PageFiabilite, PageModele, VueEnsemble } from '../pages/F3';
+import { PageComparaison } from '../pages/comparaison/Comparaison';
 import type { JSX } from 'react';
 
 function Pastille( { s }: { s: EtatLatest } ) {
@@ -56,6 +57,7 @@ export function App() {
 	const pages: Record<PageId, () => JSX.Element> = {
 		ensemble: () => <VueEnsemble latest={ latest } />,
 		exploration: () => <Exploration latest={ latest } />,
+		comparaison: () => <PageComparaison latest={ latest } />,
 		fiabilite: () => <PageFiabilite latest={ latest } />,
 		eolien: () => <Eolien latest={ latest } />,
 		alertes: () => <Alertes latest={ latest } />,

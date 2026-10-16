@@ -47,7 +47,7 @@ export const RAMPE_INCERTITUDE = [ '#F1E9F7', '#D7C2EA', '#B795D6', '#9466C0', '
  * Différence entre deux instants (comparaison, lot F6) : divergente, bleu (baisse) ↔ rouge (hausse) autour d'un
  * gris neutre (« pas de changement »), deux bras de même longueur. Distincte de la rampe de vitesse.
  */
-export const RAMPE_DIFFERENCE = [ '#0B3C73', '#1E6FB8', '#8DB8DD', '#F0EFEC', '#E8A49B', '#C0392B', '#7A1F17' ] as const;
+export const RAMPE_DIFFERENCE = [ '#0B3C73', '#1E6FB8', '#8DB8DD', '#DDDBD6', '#E8A49B', '#C0392B', '#7A1F17' ] as const;
 
 /** États (§17.4) : vert conforme / actif, orange avertissement / suspect, rouge important / muet. */
 export const ETATS = { conforme: COULEURS.ok, avertissement: COULEURS.attention, important: COULEURS.alerte, neutre: COULEURS.neutre } as const;

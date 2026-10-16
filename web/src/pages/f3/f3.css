@@ -97,3 +97,8 @@
 
 .f3-vis1 { margin-top: 0; }
 .f3-na { color: var(--encre-2); background: var(--fond); border: 1px dashed var(--trait); border-radius: 8px; padding: 12px; margin: 0; }
+
+/* Comparaison de deux instants (lot F6) */
+.comparaison-controles { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }
+.comparaison-choix { display: flex; flex-direction: column; gap: 4px; color: var(--encre-2); font-size: 12px; }
+.comparaison-choix select { max-width: 100%; font-size: 13px; }
