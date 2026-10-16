@@ -34,6 +34,7 @@ Le drapeau `--use-angle` vaut `d3d11` sous Windows, `metal` sous macOS, `gl` ail
 |---|---|---|
 | `oracles` | `oracles/` | Direction météo, champs Float32 LE `[j][i]` avec NaN sous le relief, hauteur sol / mer, REWS, cisaillement, courbe de puissance, Weibull, rose des vents. Ces calculs ne servent **qu'à vérifier** ce que renvoie l'API : décision D4, ils restent en Python. |
 | `headless` | `tests/functional/` | Fumée : bonne page, pas d'erreur JS, WebGL, `/api` en `503 service_asleep` quand le GPU dort. `scene-f2.spec.ts` : critères V3D1 à V3D8 de la scène 3D sur les 3 instantanés de test (`?scenario=`). |
+| `headless` (F6) | `tests/functional/scenario-f6.spec.ts` | Scénario §23 de bout en bout (`docs/SCENARIO_DEMO.md`) : GPU éteint (`/api` forcé en 503, `latest` hors ligne) puis, avec `ATOM_GPU_ON=1`, GPU allumé ; exports CSV téléchargés et relus. Viser le Worker sur les vrais instantanés : `ATOM_URL=http://127.0.0.1:8787`. |
 | `headed-gpu` | `tests/perf/` | FPS (5e centile sur 10 s de rotation caméra), clic → retour visuel (p95), changement d'altitude (p95), premier rendu, mémoire JS. Un seul Chrome à la fois. |
 
 ## Variables

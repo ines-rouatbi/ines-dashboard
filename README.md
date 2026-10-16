@@ -37,6 +37,13 @@ navigateur → atom.zelqane.com (ce Worker : front statique dist/ + injection cl
   altitude mer en option ; coloration vitesse / incertitude / fiabilité et légende chiffrée ; frise `/v1/times` et
   rejeu ; carte de situation (`geo/tunisia.ts`). Crochet de test `window.__atom`.
 - `web/src/ui/`, `web/src/pages/` — coquille React (barre, navigation, bandeau) et pages.
+- Lot F6 (intégration réelle) : page **Comparaison** (`/comparaison?a=&b=&h=` : deux instantanés à la même hauteur
+  au-dessus du sol, échelle commune, différence B − A seulement sur les nœuds présents des deux côtés,
+  `domain/comparaison.ts`) ; **export CSV** des valeurs affichées, généré côté client (`domain/exportCsv.ts` :
+  cartes, plan et profil de l'Exploration, comparaison) et liens `snapshot.assets.export_*` (« non disponible »
+  tant que M6 ne les publie pas) ; **charte §17.4** centralisée dans `web/src/ui/couleurs.ts` et les variables CSS
+  de `theme.css` (contrôlées par `dev/charte.test.ts`, contrastes AA) ; état du service de calcul (`/api/health`)
+  sur la page Modèle. Scénario de démonstration : `docs/SCENARIO_DEMO.md`.
 - Repère : x = Est (u), z = -Nord (v), y = altitude (w). Nœud (i, j) en `x0 + i·dx`, `y0 + j·dy` ; un nœud
   existe ssi `z − relief ≥ grid.min_agl_m`. Niveaux au-dessus du niveau de la mer, adressés par **indice**
   (0..nz-1) ; la grille est toujours lue dans `/v1/meta`. « Position supposée » affichée si `georef.suppose`.
@@ -64,6 +71,8 @@ Le connecteur se lance sur le Colab d'ines (voir la remise hors salon).
 npm install
 npm run dev                          # Vite sur http://localhost:5173, /v1/* servi par les fixtures
 ATOM_FIXTURE=gpu_eteint npm run dev  # autre scénario : normal | capteur_en_derive | gpu_eteint
+ATOM_V1_ORIGIN=http://127.0.0.1:8787 npm run dev   # vrais instantanés : /v1 et /api relayés vers ce Worker (lecture)
+ATOM_REEL_URL=http://127.0.0.1:8787 npm test       # web/src/pages/reel.test.tsx sur ce Worker (sautée s'il ne répond pas)
 npm run typecheck && npm test        # types + tests Vitest
 npm run build && npm run worker:dev  # Worker local (wrangler dev) sur dist/, http://127.0.0.1:8787
 npm run contract:check               # valide schémas, instantanés de test et invariants (ajv)
