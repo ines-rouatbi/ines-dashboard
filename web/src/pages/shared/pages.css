@@ -4,11 +4,12 @@
    sa teinte de marque (bordure) et sa variante « texte » (≥ 4,5:1), et toujours un libellé. */
 .atom-page {
 	--atom-bg: var( --fond ); --atom-card: var( --panneau ); --atom-line: var( --trait ); --atom-text: var( --encre ); --atom-muted: var( --encre-3 );
-	--atom-critique: #7A1F17; --atom-important: var( --alerte-texte ); --atom-avertissement: var( --attention-texte ); --atom-information: var( --accent-texte );
+	--atom-critique: var( --critique ); --atom-important: var( --alerte-texte ); --atom-avertissement: var( --attention-texte ); --atom-information: var( --accent-texte );
 	--atom-ok: var( --ok-texte );
 	color: var( --atom-text ); font: 14px/1.45 var( --police-texte ); padding: 16px;
 }
 .atom-card, .atom-kpi, .atom-alert, .atom-table { box-shadow: var( --ombre ); }
+.atom-card { border-radius: var( --rayon ); }
 .atom-page h2 { margin: 0 0 12px; font-size: 20px; }
 .atom-page h3 { margin: 18px 0 8px; font-size: 15px; }
 .atom-muted { color: var( --atom-muted ); font-weight: normal; }

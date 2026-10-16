@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { COULEURS, ETATS, RAMPE_DIFFERENCE, RAMPE_INCERTITUDE, RAMPE_VITESSE, VARIABLES_CSS, contraste, luminance } from '../web/src/ui/couleurs';
+import { COULEURS, COULEURS_SOMBRE, ETATS, RAMPE_DIFFERENCE, RAMPE_INCERTITUDE, RAMPE_VITESSE, VARIABLES_CSS, VARIABLES_CSS_SOMBRE, contraste, luminance } from '../web/src/ui/couleurs';
 import { ETAT_CAPTEUR } from '../web/src/pages/f3/couleurs';
 
 // Lu sur disque : sous Vitest, l'import d'un .css (même ?raw) rend une chaîne vide.
@@ -11,6 +11,8 @@ const css = readFileSync( new URL( '../web/src/ui/theme.css', import.meta.url ),
 
 const racine = /:root\s*\{([^}]*)\}/.exec( css )?.[ 1 ] ?? '';
 const variables = Object.fromEntries( [ ...racine.matchAll( /(--[\w-]+)\s*:\s*([^;]+);/g ) ].map( ( m ) => [ m[ 1 ], m[ 2 ].trim() ] ) );
+const sombre = /:root\[data-theme="dark"\]\s*\{([^}]*)\}/.exec( css )?.[ 1 ] ?? '';
+const variablesSombre = Object.fromEntries( [ ...sombre.matchAll( /(--[\w-]+)\s*:\s*([^;]+);/g ) ].map( ( m ) => [ m[ 1 ], m[ 2 ].trim() ] ) );
 
 describe( 'Charte §17.4 : couleurs d’interface', () => {
 
@@ -124,6 +126,45 @@ describe( 'Charte §17.4 : rampes et états', () => {
 		const formes = new Set( Object.values( ETAT_CAPTEUR ).map( ( e ) => e.forme ) );
 		expect( formes.size ).toBe( Object.keys( ETAT_CAPTEUR ).length );
 		for ( const e of Object.values( ETAT_CAPTEUR ) ) expect( e.libelle.length ).toBeGreaterThan( 0 );
+
+	} );
+
+} );
+
+describe( 'Charte §17.4 : thème sombre (UI v2)', () => {
+
+	it( 'theme.css déclare chaque variable du thème sombre avec la valeur de COULEURS_SOMBRE', () => {
+
+		expect( Object.keys( VARIABLES_CSS_SOMBRE ).sort() ).toEqual( Object.keys( VARIABLES_CSS ).sort() );
+		for ( const [ nom, valeur ] of Object.entries( VARIABLES_CSS_SOMBRE ) ) expect( variablesSombre[ nom ]?.toUpperCase(), nom ).toBe( valeur.toUpperCase() );
+
+	} );
+
+	const textes = [ 'encre', 'encre2', 'encre3', 'accentTexte', 'sableTexte', 'okTexte', 'attentionTexte', 'alerteTexte' ] as const;
+	it.each( textes )( 'texte %s ≥ 4,5:1 sur les panneaux et sur le fond sombres', ( k ) => {
+
+		expect( contraste( COULEURS_SOMBRE[ k ], COULEURS_SOMBRE.panneau ) ).toBeGreaterThanOrEqual( 4.5 );
+		expect( contraste( COULEURS_SOMBRE[ k ], COULEURS_SOMBRE.fond ) ).toBeGreaterThanOrEqual( 4.5 );
+
+	} );
+
+	it( 'texte blanc sur l’accent sombre (navigation, boutons)', () => {
+
+		expect( contraste( '#FFFFFF', COULEURS_SOMBRE.accent ) ).toBeGreaterThanOrEqual( 4.5 );
+
+	} );
+
+	it.each( [ 'ok', 'attention', 'alerte', 'accent', 'sable' ] as const )( 'marque %s ≥ 3:1 sur les panneaux et sur le fond sombres', ( k ) => {
+
+		expect( contraste( COULEURS_SOMBRE[ k ], COULEURS_SOMBRE.panneau ) ).toBeGreaterThanOrEqual( 3 );
+		expect( contraste( COULEURS_SOMBRE[ k ], COULEURS_SOMBRE.fond ) ).toBeGreaterThanOrEqual( 3 );
+
+	} );
+
+	it( 'les rampes de données ne dépendent pas du thème (même sens dans les deux thèmes)', () => {
+
+		expect( RAMPE_VITESSE[ 0 ] ).toBe( '#1A2A6C' );
+		expect( css ).not.toMatch( /data-theme="dark"[^{]*\{[^}]*--rampe/ );
 
 	} );
 
