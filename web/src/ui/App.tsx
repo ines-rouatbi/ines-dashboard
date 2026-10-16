@@ -3,11 +3,24 @@
 import { useLatest, type EtatLatest } from './useLatest';
 import { ROUTES, naviguer, useRoute, type PageId } from './routes';
 import { texteBandeau } from '../domain/freshness';
-import { Exploration } from '../pages/Exploration';
-import { Alertes, Eolien } from '../pages/F4';
-import { PageFiabilite, PageModele, VueEnsemble } from '../pages/F3';
-import { PageComparaison } from '../pages/comparaison/Comparaison';
-import type { JSX } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
+
+// Pages chargées à la demande (import dynamique) : three.js (Exploration) et ECharts sortent du chargement
+// initial ; chaque page est un morceau séparé, préchargé au survol du lien de navigation.
+type PropsPage = { latest: EtatLatest };
+const PAGES_MODULES: Record<PageId, () => Promise<{ default: ComponentType<PropsPage> }>> = {
+	ensemble: () => import( '../pages/f3/Ensemble' ).then( ( m ) => ( { default: m.VueEnsemble } ) ),
+	exploration: () => import( '../pages/Exploration' ).then( ( m ) => ( { default: m.Exploration } ) ),
+	comparaison: () => import( '../pages/comparaison/Comparaison' ).then( ( m ) => ( { default: m.PageComparaison } ) ),
+	fiabilite: () => import( '../pages/f3/Fiabilite' ).then( ( m ) => ( { default: m.PageFiabilite } ) ),
+	eolien: () => import( '../pages/F4' ).then( ( m ) => ( { default: m.Eolien } ) ),
+	alertes: () => import( '../pages/F4' ).then( ( m ) => ( { default: m.Alertes } ) ),
+	modele: () => import( '../pages/f3/Modele' ).then( ( m ) => ( { default: m.PageModele } ) ),
+};
+const PAGES = Object.fromEntries( Object.entries( PAGES_MODULES ).map( ( [ k, f ] ) => [ k, lazy( f ) ] ) ) as unknown as Record<PageId, ComponentType<PropsPage>>;
+
+/** Précharge le code d'une page (survol ou focus de son lien). */
+export function prechargerPage( id: PageId ) { PAGES_MODULES[ id ]().catch( () => {} ); }
 
 function Pastille( { s }: { s: EtatLatest } ) {
 
@@ -54,15 +67,7 @@ export function App() {
 	const route = useRoute();
 	const latest = useLatest();
 
-	const pages: Record<PageId, () => JSX.Element> = {
-		ensemble: () => <VueEnsemble latest={ latest } />,
-		exploration: () => <Exploration latest={ latest } />,
-		comparaison: () => <PageComparaison latest={ latest } />,
-		fiabilite: () => <PageFiabilite latest={ latest } />,
-		eolien: () => <Eolien latest={ latest } />,
-		alertes: () => <Alertes latest={ latest } />,
-		modele: () => <PageModele latest={ latest } />,
-	};
+	const Page = PAGES[ route.id ];
 
 	return (
 		<div className="app">
@@ -78,6 +83,8 @@ export function App() {
 							href={ r.chemin }
 							className={ r.id === route.id ? 'actif' : undefined }
 							aria-current={ r.id === route.id ? 'page' : undefined }
+							onMouseEnter={ () => prechargerPage( r.id ) }
+							onFocus={ () => prechargerPage( r.id ) }
 							onClick={ ( e ) => { if ( e.button === 0 && ! e.metaKey && ! e.ctrlKey ) { e.preventDefault(); naviguer( r.chemin ); } } }
 						>{ r.titre }</a>
 					) ) }
@@ -86,7 +93,11 @@ export function App() {
 				<Pastille s={ latest } />
 			</header>
 			<Bandeau s={ latest } />
-			<main className="page">{ pages[ route.id ]() }</main>
+			<main className="page">
+				<Suspense fallback={ <p className="page-vide muet" role="status">chargement de la page…</p> }>
+					<Page latest={ latest } />
+				</Suspense>
+			</main>
 		</div>
 	);
 
