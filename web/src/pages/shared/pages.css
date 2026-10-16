@@ -1,10 +1,14 @@
-/* Styles des pages Éolien et Alertes (lot F4). Variables à brancher sur la charte de F0 / 17.4. */
+/* Styles des pages Éolien et Alertes (lot F4), branchés sur la charte §17.4 (variables de theme.css, lot F6).
+   Le thème sombre d'origine posait un texte clair sur le fond clair de la coquille (illisible hors des cartes).
+   Niveaux : rouge foncé critique, rouge important, orange avertissement, accent information ; chaque niveau a
+   sa teinte de marque (bordure) et sa variante « texte » (≥ 4,5:1), et toujours un libellé. */
 .atom-page {
-	--atom-bg: #0f1720; --atom-card: #17212b; --atom-line: #26323f; --atom-text: #e6edf3; --atom-muted: #8b98a5;
-	--atom-critique: #e5484d; --atom-important: #f76b15; --atom-avertissement: #ffc53d; --atom-information: #3e9bff;
-	--atom-ok: #30a46c;
-	color: var( --atom-text ); font: 14px/1.45 system-ui, sans-serif; padding: 16px;
+	--atom-bg: var( --fond ); --atom-card: var( --panneau ); --atom-line: var( --trait ); --atom-text: var( --encre ); --atom-muted: var( --encre-3 );
+	--atom-critique: #7A1F17; --atom-important: var( --alerte-texte ); --atom-avertissement: var( --attention-texte ); --atom-information: var( --accent-texte );
+	--atom-ok: var( --ok-texte );
+	color: var( --atom-text ); font: 14px/1.45 var( --police-texte ); padding: 16px;
 }
+.atom-card, .atom-kpi, .atom-alert, .atom-table { box-shadow: var( --ombre ); }
 .atom-page h2 { margin: 0 0 12px; font-size: 20px; }
 .atom-page h3 { margin: 18px 0 8px; font-size: 15px; }
 .atom-muted { color: var( --atom-muted ); font-weight: normal; }
@@ -26,11 +30,11 @@ button.atom-kpi[aria-pressed="false"] { opacity: .45; }
 .atom-badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; }
 .atom-level-critique { border-left-color: var( --atom-critique ); } .atom-level-critique .atom-badge { color: var( --atom-critique ); }
 .atom-level-important { border-left-color: var( --atom-important ); } .atom-level-important .atom-badge { color: var( --atom-important ); }
-.atom-level-avertissement { border-left-color: var( --atom-avertissement ); } .atom-level-avertissement .atom-badge { color: var( --atom-avertissement ); }
+.atom-level-avertissement { border-left-color: var( --attention ); } .atom-level-avertissement .atom-badge { color: var( --atom-avertissement ); }
 .atom-level-information { border-left-color: var( --atom-information ); } .atom-level-information .atom-badge { color: var( --atom-information ); }
 .atom-kpi.atom-level-critique { border-top: 3px solid var( --atom-critique ); }
 .atom-kpi.atom-level-important { border-top: 3px solid var( --atom-important ); }
-.atom-kpi.atom-level-avertissement { border-top: 3px solid var( --atom-avertissement ); }
+.atom-kpi.atom-level-avertissement { border-top: 3px solid var( --attention ); }
 .atom-kpi.atom-level-information { border-top: 3px solid var( --atom-information ); }
 
 .atom-kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 8px 0 0; }

@@ -2,12 +2,16 @@
 // du meta (grille, niveaux au-dessus de la mer, min_agl_m, géoréférencement « supposé »), codage des
 // champs, contrôles physiques de l'instant (D11) et qualité des données d'entrée (D12).
 
+import type { JSX } from 'react';
 import { api } from '../../data';
 import type { DataQuality, Meta, Snapshot, Versions } from '../../data/contract';
 import type { EtatLatest } from '../../ui/useLatest';
 import { NA, num, utc, withUnit } from '../shared/format';
 import { AvecRessource, EtatPageF3, oui, pourcent, scientifique, useAsync, useInstantane } from './commun';
 import { chargerModele, type DonneesModele } from './donnees';
+import { FIELD_VARS } from '../../data/contract';
+import { ExportsPublies } from '../../ui/Exports';
+import { ServiceCalcul, useServiceCalcul } from '../../ui/ServiceCalcul';
 
 const NATURE: Record<Versions[ 'data_kind' ], string> = {
 	test: 'test (instantané de test : pas un résultat du modèle)',
@@ -35,11 +39,17 @@ export function PageModele( { latest }: { latest: EtatLatest } ) {
 	const d = useAsync( snap.etat === 'ok' ? snap.val.snapshot_id : null, ( s ) => chargerModele( api, ( snap as { val: Snapshot } ).val, s ) );
 	if ( snap.etat !== 'ok' ) return <EtatPageF3 titre="Modèle" nom="modele" etat={ snap } />;
 	if ( d.etat !== 'ok' ) return <EtatPageF3 titre="Modèle" nom="modele" etat={ d } />;
-	return <Modele d={ d.val } />;
+	return <Modele d={ d.val } service={ <ServiceDeCalcul /> } />;
 
 }
 
-export function Modele( { d }: { d: DonneesModele } ) {
+function ServiceDeCalcul() {
+
+	return <ServiceCalcul s={ useServiceCalcul() } />;
+
+}
+
+export function Modele( { d, service = null }: { d: DonneesModele; service?: JSX.Element | null } ) {
 
 	const { snapshot, meta } = d;
 	return (
@@ -47,8 +57,10 @@ export function Modele( { d }: { d: DonneesModele } ) {
 			<header className="f3-entete">
 				<h1>Modèle</h1>
 				<p className="muet">Instantané du { utc( snapshot.valid_time ) } · <code>{ snapshot.snapshot_id }</code></p>
+				<ExportsPublies snapshot={ snapshot } />
 			</header>
 			<div className="f3-grille-2">
+				{ service }
 				<Versions v={ snapshot.versions } meta={ meta } />
 				<Grille meta={ meta } />
 				<Georef meta={ meta } />
@@ -191,6 +203,7 @@ function QualiteDonnees( { q }: { q: DataQuality } ) {
 
 function Codage( { meta }: { meta: Meta } ) {
 
+	const absentes = FIELD_VARS.filter( ( f ) => ! meta.fields.includes( f ) );
 	return (
 		<section className="f3-bloc" aria-labelledby="titre-codage">
 			<h2 id="titre-codage">Champs publiés</h2>
@@ -211,6 +224,11 @@ function Codage( { meta }: { meta: Meta } ) {
 					} ) }</tbody>
 				</table>
 			</div>
+			{ absentes.length ? (
+				<p className="petit muet" data-testid="champs-non-publies">
+					Non publiées pour ce modèle (non disponible) : { absentes.map( ( f, k ) => <span key={ f }>{ k ? ', ' : '' }<code>{ f }</code></span> ) }.
+				</p>
+			) : null }
 			<p className="petit muet">Direction : d'où vient le vent, (270 − atan2(v, u)) mod 360, arrondie avant le modulo ; indéfinie sous 0,2 m/s.</p>
 		</section>
 	);

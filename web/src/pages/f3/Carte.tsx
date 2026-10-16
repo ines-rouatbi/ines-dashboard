@@ -10,6 +10,7 @@ import type { Snapshot, Station } from '../../data/contract';
 import type { Resume } from '../../domain/hauteurSol';
 import { NA, num } from '../shared/format';
 import { ETAT_CAPTEUR, couleurRampe, hexVersRgb } from './couleurs';
+import { BoutonCsv } from '../../ui/Exports';
 
 export type Echelle =
 	| { kind: 'continue'; min: number; max: number; rampe: readonly string[]; unite: string; decimales: number }
@@ -77,9 +78,11 @@ export interface PropsCarte {
 	/** Message affiché sur la carte si aucune colonne n'a de valeur. */
 	videTexte?: string;
 	onPeinte?: () => void;
+	/** Export CSV des valeurs affichées (lot F6) : nom du fichier et générateur appelé au clic. */
+	exporter?: { nom: string; generer: () => string };
 }
 
-export function Carte( { titre, detail, valeurs, grille, echelle, resume, stations = [], testid, videTexte, onPeinte }: PropsCarte ) {
+export function Carte( { titre, detail, valeurs, grille, echelle, resume, stations = [], testid, videTexte, onPeinte, exporter }: PropsCarte ) {
 
 	const ref = useRef<HTMLCanvasElement | null>( null );
 	const [ survol, setSurvol ] = useState<{ x: number; y: number; texte: string } | null>( null );
@@ -129,6 +132,7 @@ export function Carte( { titre, detail, valeurs, grille, echelle, resume, statio
 			</div>
 			<p className="f3-carte-resume petit" data-testid={ `${ testid }-resume` }>{ resumeTexte }</p>
 			<p className="f3-carte-axes petit muet">{ num( largeurKm, 1 ) } km (Est) × { num( hauteurKm, 1 ) } km (Nord), nœud (0, 0) au sud-ouest</p>
+			{ exporter && resume.disponibles ? <BoutonCsv nom={ exporter.nom } generer={ exporter.generer } testid={ `${ testid }-export` } /> : null }
 		</figure>
 	);
 

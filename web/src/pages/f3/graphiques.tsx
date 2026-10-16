@@ -7,9 +7,10 @@ import type { Quality } from '../../data/contract';
 import { NA, num, utc } from '../shared/format';
 import { useECharts } from '../shared/useECharts';
 import { CLASSES, SERIE } from './couleurs';
+import { COULEURS } from '../../ui/couleurs';
 import type { PointMoyeu } from './donnees';
 
-const ENCRE = '#12263A', MUET = '#6B7D8D', GRILLE = '#E1E0D9', AXE = '#C3C2B7';
+const ENCRE = COULEURS.encre, MUET = COULEURS.encre3, GRILLE = '#E1E0D9', AXE = '#C3C2B7';
 const fr = ( v: number ) => v.toLocaleString( 'fr-FR' );
 const AXIS = { axisLine: { lineStyle: { color: AXE } }, axisLabel: { color: MUET }, splitLine: { lineStyle: { color: GRILLE } }, nameTextStyle: { color: MUET } };
 
@@ -24,6 +25,8 @@ export function SerieMoyeu( { points, hauteur }: { points: PointMoyeu[]; hauteur
 
 	const option = useMemo<EChartsOption>( () => ( {
 		animation: false,
+		// Les instantanés sont datés en UTC : l'axe du temps aussi (sinon ECharts suit le fuseau du navigateur).
+		useUTC: true,
 		textStyle: { color: ENCRE, fontFamily: 'Inter, system-ui, sans-serif' },
 		tooltip: {
 			trigger: 'axis',
@@ -31,7 +34,7 @@ export function SerieMoyeu( { points, hauteur }: { points: PointMoyeu[]; hauteur
 		},
 		legend: { top: 0, left: 0, textStyle: { color: ENCRE } },
 		grid: { left: 52, right: 16, top: 36, bottom: 36 },
-		xAxis: { type: 'time', ...AXIS, splitLine: { show: false } },
+		xAxis: { type: 'time', name: 'UTC', nameLocation: 'end', ...AXIS, splitLine: { show: false } },
 		yAxis: { type: 'value', name: 'm/s', min: 0, ...AXIS, axisLabel: { color: MUET, formatter: fr } },
 		series: ( [ [ 'moyenne', 'Moyenne sur le domaine' ], [ 'max', 'Maximum sur le domaine' ] ] as const ).map( ( [ cle, nom ], k ) => ( {
 			name: nom,

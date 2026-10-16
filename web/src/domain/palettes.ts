@@ -1,13 +1,16 @@
 // Coloration de la scène (lignes de courant, coupes) et légende chiffrée.
 //
 // Trois variables, toutes lues dans les champs publiés (jamais recalculées) :
-//   vitesse     → `speed` (norme horizontale, m/s), palette viridis, échelle min..max du plan affiché ;
-//   incertitude → `sigma_speed` (écart-type calibré, m/s), palette « magma », échelle 0..max du plan ;
+//   vitesse     → `speed` (norme horizontale, m/s), rampe de la charte §17.4 (bleu nuit, cyan, vert, jaune,
+//                 orange, rouge), échelle min..max du plan affiché ;
+//   incertitude → `sigma_speed` (écart-type calibré, m/s), rampe violette de la charte (clair = faible),
+//                 échelle 0..max du plan ;
 //   fiabilité   → `reliability` (0..1), échelle fixe 0..1, classes aux seuils du contrat (0,5 ; 0,75).
 // Une valeur inconnue (NaN) prend la couleur NEUTRE, signalée « non disponible » dans la légende.
 
 import { SEUIL_ELEVEE, SEUIL_MOYENNE } from './fiabilite';
 import type { FieldVar } from '../data/contract';
+import { RAMPE_INCERTITUDE, RAMPE_VITESSE } from '../ui/couleurs';
 
 export type Coloration = 'vitesse' | 'incertitude' | 'fiabilite';
 
@@ -21,19 +24,11 @@ export const LIBELLE_COLORATION: Record<Coloration, { titre: string; unite: stri
 
 type RGB = [ number, number, number ];
 
-const VIRIDIS: RGB[] = [
-	[ 0.267, 0.005, 0.329 ], [ 0.283, 0.141, 0.458 ], [ 0.254, 0.265, 0.530 ],
-	[ 0.207, 0.372, 0.553 ], [ 0.164, 0.471, 0.558 ], [ 0.128, 0.567, 0.551 ],
-	[ 0.135, 0.659, 0.518 ], [ 0.267, 0.749, 0.441 ], [ 0.478, 0.821, 0.318 ],
-	[ 0.741, 0.873, 0.150 ], [ 0.993, 0.906, 0.144 ],
-];
+/** #RRGGBB → RVB 0..1. */
+const rvb = ( hex: string ): RGB => [ 1, 3, 5 ].map( ( k ) => parseInt( hex.slice( k, k + 2 ), 16 ) / 255 ) as RGB;
 
-const MAGMA: RGB[] = [
-	[ 0.001, 0.000, 0.014 ], [ 0.078, 0.054, 0.212 ], [ 0.232, 0.059, 0.437 ],
-	[ 0.390, 0.100, 0.502 ], [ 0.550, 0.161, 0.506 ], [ 0.716, 0.215, 0.475 ],
-	[ 0.868, 0.288, 0.409 ], [ 0.967, 0.439, 0.360 ], [ 0.994, 0.624, 0.427 ],
-	[ 0.995, 0.807, 0.571 ], [ 0.987, 0.991, 0.750 ],
-];
+const VITESSE: RGB[] = RAMPE_VITESSE.map( rvb );
+const INCERTITUDE: RGB[] = RAMPE_INCERTITUDE.map( rvb );
 
 // Fiabilité : rouge (faible) → ocre (moyenne) → vert (élevée), ruptures aux seuils du contrat.
 const FIAB: { t: number; c: RGB }[] = [
@@ -76,7 +71,8 @@ function rampeFiab( v: number ): RGB {
 
 }
 
-export function viridis( t: number ): RGB { return rampe( VIRIDIS, t ); }
+/** Rampe de vitesse de la charte en t ∈ [0, 1]. */
+export function rampeVitesse( t: number ): RGB { return rampe( VITESSE, t ); }
 
 /** Échelle d'une coloration : [min, max] des valeurs, ou null si aucune valeur définie. */
 export interface Echelle { coloration: Coloration; min: number; max: number }
@@ -100,7 +96,7 @@ export function couleur( e: Echelle | null, v: number ): RGB {
 	if ( ! e || Number.isNaN( v ) ) return NEUTRE;
 	if ( e.coloration === 'fiabilite' ) return rampeFiab( v );
 	const t = ( v - e.min ) / ( e.max - e.min );
-	return e.coloration === 'vitesse' ? rampe( VIRIDIS, t ) : rampe( MAGMA, 0.15 + 0.85 * t );
+	return e.coloration === 'vitesse' ? rampe( VITESSE, t ) : rampe( INCERTITUDE, t );
 
 }
 

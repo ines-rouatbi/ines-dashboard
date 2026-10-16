@@ -1,26 +1,39 @@
-/* Charte ATOM-AI (cahier des charges §17.4) : encre #12263A, fond #E9EEF1, panneaux
-   blancs, accent #1E6FB8, sable #B8925A (relief), police Inter, chiffres tabulaires. */
+/* Charte ATOM-AI (cahier des charges §17.4) : encre #12263A, fond #E9EEF1, panneaux blancs, accent #1E6FB8,
+   sable #B8925A (relief) ; Inter pour le texte, Inter Display pour les titres, chiffres tabulaires.
+   Mêmes valeurs que web/src/ui/couleurs.ts (contrôlé par charte.test.ts, avec les contrastes AA).
+   Les variantes « -texte » servent au texte sur fond clair (≥ 4,5:1), les teintes de base aux marques. */
 
 :root {
 	--encre: #12263A;
 	--encre-2: #3C5266;
-	--encre-3: #6B7D8D;
+	--encre-3: #586A7B;
 	--fond: #E9EEF1;
 	--panneau: #FFFFFF;
 	--accent: #1E6FB8;
+	--accent-texte: #1A62A3;
 	--sable: #B8925A;
+	--sable-texte: #7A5A2E;
 	--trait: #D5DDE3;
 	--ok: #2E8B57;
+	--ok-texte: #1F7A4A;
+	--attention: #CF6B12;
+	--attention-texte: #9A5208;
 	--alerte: #C0392B;
+	--alerte-texte: #B0331F;
 	--attente: #6B7D8D;
+	--police-texte: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--police-titres: "Inter Display", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	--rayon: 10px;
 	--ombre: 0 1px 2px rgba(18, 38, 58, .06), 0 4px 16px rgba(18, 38, 58, .06);
-	font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	font-family: var(--police-texte);
 	color: var(--encre);
 	background: var(--fond);
 	font-size: 14px;
 	-webkit-font-smoothing: antialiased;
 }
+
+h1, h2, h3, .titre { font-family: var(--police-titres); }
+table, :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; }
@@ -164,7 +177,7 @@ input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent);
 .tableau-profil { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
 .tableau-profil th { text-align: right; font-weight: 600; color: var(--encre-2); border-bottom: 1px solid var(--trait); padding: 3px 4px; }
 .tableau-profil td { text-align: right; padding: 3px 3px; border-bottom: 1px solid #F0F3F5; }
-.tableau-profil tr.sous-relief td { color: var(--sable); }
+.tableau-profil tr.sous-relief td { color: var(--sable-texte); }
 
 /* ---- Badge de nature des données (versions.data_kind) ---- */
 .badge-nature {
@@ -201,7 +214,7 @@ select { font: inherit; padding: 3px 6px; border: 1px solid var(--trait); border
 	background: var(--accent); color: #fff; white-space: nowrap;
 }
 .bouton:disabled { background: var(--trait); border-color: var(--trait); color: var(--encre-3); cursor: not-allowed; }
-.lien { font: inherit; border: 0; background: none; color: var(--accent); cursor: pointer; text-decoration: underline; padding: 0 0 0 6px; }
+.lien { font: inherit; border: 0; background: none; color: var(--accent-texte); cursor: pointer; text-decoration: underline; padding: 0 0 0 6px; }
 .frise {
 	display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; gap: 4px 12px; align-items: center;
 	background: var(--panneau); border-radius: var(--rayon); box-shadow: var(--ombre); padding: 10px 14px;
@@ -224,3 +237,12 @@ select { font: inherit; padding: 3px 6px; border: 1px solid var(--trait); border
 .situation .fleche-nord { fill: var(--encre); }
 .situation .barre-echelle { fill: var(--encre); }
 .situation figcaption { margin-top: 4px; }
+
+/* ---- Exports et service de calcul (lot F6) ---- */
+.bouton-secondaire { background: var(--panneau); color: var(--accent-texte); }
+.bouton-secondaire:hover:not(:disabled) { background: var(--fond); }
+.export-csv { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; }
+.exports-publies { margin: 4px 0 0; }
+.etat { font-weight: 600; }
+.etat-ok { color: var(--ok-texte); }
+.etat-arret { color: var(--alerte-texte); }

@@ -11,8 +11,8 @@ import type { EtatLatest } from '../../ui/useLatest';
 import { NA, num, utc, withUnit } from '../shared/format';
 import { AvecRessource, EtatPageF3, cacheChamps, type Chargement, oui, pourcent, useAsync, useInstantane } from './commun';
 import { Carte, Legende, LegendeCapteurs, bornesEchelle, type Echelle } from './Carte';
-import { RAMPE_BLEUE, RAMPE_ORANGE, STATUT } from './couleurs';
-import { chargerBase, chargerCartes, chargerSimulation, type Base, type CarteSol, type Simulation } from './donnees';
+import { RAMPE_BLEUE, RAMPE_INCERTITUDE, RAMPE_VITESSE, STATUT } from './couleurs';
+import { chargerBase, chargerCartes, chargerSimulation, exportCarte, type Base, type CarteSol, type Simulation } from './donnees';
 import { texteCarteVide } from './Ensemble';
 import { RepartitionClasses } from './graphiques';
 
@@ -30,8 +30,8 @@ export function echelleVariable( v: FieldVar, max: number | null ): Echelle {
 
 	if ( v === 'status' ) return { kind: 'categories', categories: [ { valeur: 1, libelle: 'mesuré (capteur visible à ±15 m)', couleur: STATUT.mesure }, { valeur: 0, libelle: 'estimé', couleur: STATUT.estime } ] };
 	if ( v === 'coverage' || v === 'reliability' ) return { kind: 'continue', min: 0, max: 1, rampe: RAMPE_BLEUE, unite: '0–1', decimales: 2 };
-	if ( v === 'sigma_speed' ) return { kind: 'continue', ...bornesEchelle( max, 0.5 ), rampe: RAMPE_ORANGE, unite: 'm/s', decimales: 2 };
-	return { kind: 'continue', ...bornesEchelle( max, 2 ), rampe: RAMPE_BLEUE, unite: 'm/s', decimales: 1 };
+	if ( v === 'sigma_speed' ) return { kind: 'continue', ...bornesEchelle( max, 0.5 ), rampe: RAMPE_INCERTITUDE, unite: 'm/s', decimales: 2 };
+	return { kind: 'continue', ...bornesEchelle( max, 2 ), rampe: RAMPE_VITESSE, unite: 'm/s', decimales: 1 };
 
 }
 
@@ -53,7 +53,10 @@ function Fiabilite( { snapshot }: { snapshot: Snapshot } ) {
 	const [ hauteur, setHauteur ] = useState<number>( 100 );
 	const [ variable, setVariable ] = useState<VarIncertitude>( 'sigma_speed' );
 	const vent = useAsync( b ? `${ id }:speed:${ hauteur }` : null, () => chargerCartes( cacheChamps, b!, 'speed', [ hauteur ] ) );
-	const incert = useAsync( b ? `${ id }:${ variable }:${ hauteur }` : null, () => chargerCartes( cacheChamps, b!, variable, [ hauteur ] ) );
+	// Variable absente de meta.fields (module de fiabilité M2 pas encore actif) : aucune requête, « non disponible ».
+	const publiee = b ? b.meta.fields.includes( variable ) : true;
+	const incert = useAsync( b && publiee ? `${ id }:${ variable }:${ hauteur }` : null, () => chargerCartes( cacheChamps, b!, variable, [ hauteur ] ) );
+	const libelleVariable = VARIABLES_INCERTITUDE.find( ( x ) => x.v === variable )!.libelle;
 
 	return (
 		<section className="f3-page" data-testid="page-fiabilite">
@@ -73,7 +76,7 @@ function Fiabilite( { snapshot }: { snapshot: Snapshot } ) {
 					<label>
 						Incertitude :{ ' ' }
 						<select value={ variable } onChange={ ( e ) => setVariable( e.target.value as VarIncertitude ) } data-testid="variable-incertitude">
-							{ VARIABLES_INCERTITUDE.map( ( x ) => <option key={ x.v } value={ x.v }>{ x.libelle }</option> ) }
+							{ VARIABLES_INCERTITUDE.map( ( x ) => <option key={ x.v } value={ x.v }>{ x.libelle }{ b && ! b.meta.fields.includes( x.v ) ? ' (non publiée)' : '' }</option> ) }
 						</select>
 					</label>
 				</div>
@@ -82,7 +85,9 @@ function Fiabilite( { snapshot }: { snapshot: Snapshot } ) {
 						<LegendeCapteurs reseau={ snapshot.network } stations={ b.stations.etat === 'ok' ? b.stations.val.items : null } />
 						<div className="f3-cartes f3-cartes-2">
 							<CarteVariable base={ b } c={ vent } titre={ `Vitesse horizontale à ${ num( hauteur ) } m au-dessus du sol` } testid="carte-vent" />
-							<CarteVariable base={ b } c={ incert } titre={ `${ VARIABLES_INCERTITUDE.find( ( x ) => x.v === variable )!.libelle } à ${ num( hauteur ) } m au-dessus du sol` } testid="carte-incertitude" />
+							{ publiee
+								? <CarteVariable base={ b } c={ incert } titre={ `${ libelleVariable } à ${ num( hauteur ) } m au-dessus du sol` } testid="carte-incertitude" />
+								: <VariableNonPubliee libelle={ libelleVariable } methode={ b.quality.etat === 'ok' ? b.quality.val.uncertainty.method : null } /> }
 						</div>
 						<p className="petit muet">
 							Couverture et fiabilité : octets 0..254 ramenés à 0..1, 255 = absent. Statut : niveau encadrant le plus proche,
@@ -109,6 +114,18 @@ function Fiabilite( { snapshot }: { snapshot: Snapshot } ) {
 
 }
 
+/** Variable de fiabilité absente de meta.fields : jamais de carte vide présentée comme une valeur. */
+export function VariableNonPubliee( { libelle, methode }: { libelle: string; methode: string | null } ) {
+
+	return (
+		<p className="f3-na" data-testid="carte-incertitude-non-publiee">
+			{ libelle } : { NA }. Cette variable n’est pas publiée pour cet instantané (absente de <code>meta.fields</code>)
+			{ methode === 'aucune' ? ' : le module de fiabilité (M2) n’était pas actif, méthode d’incertitude « aucune ».' : '.' }
+		</p>
+	);
+
+}
+
 function CarteVariable( { base, c, titre, testid }: { base: Base; c: Chargement<CarteSol[]>; titre: string; testid: string } ) {
 
 	const carte = c.etat === 'ok' ? c.val[ 0 ] : null;
@@ -122,7 +139,8 @@ function CarteVariable( { base, c, titre, testid }: { base: Base; c: Chargement<
 			<Legende echelle={ echelle } titre={ titreLegende } />
 			<Carte testid={ testid } titre={ titre } valeurs={ carte.valeurs } echelle={ echelle } resume={ carte.resume }
 				grille={ { nx: g.nx, ny: g.ny, dx: g.dx_m, dy: g.dy_m, x0: g.x0_m, y0: g.y0_m } }
-				stations={ base.stations.etat === 'ok' ? base.stations.val.items : [] } videTexte={ texteCarteVide( carte.resume, base.meta ) } />
+				stations={ base.stations.etat === 'ok' ? base.stations.val.items : [] } videTexte={ texteCarteVide( carte.resume, base.meta ) }
+				exporter={ exportCarte( base, carte, echelle.kind === 'continue' ? echelle.unite : 'code' ) } />
 		</div>
 	);
 
@@ -157,9 +175,13 @@ export function Methode( { q }: { q: Quality } ) {
 export function Repartition( { q }: { q: Quality } ) {
 
 	if ( ! q.by_level.length ) return <p className="muet">Répartition : { NA }.</p>;
+	// Avant M2, toutes les parts sont null : pas de graphique vide qui ressemblerait à « 0 % ».
+	const vide = q.by_level.every( ( l ) => l.share_elevee == null && l.share_moyenne == null && l.share_faible == null );
 	return (
 		<>
-			<RepartitionClasses niveaux={ q.by_level } />
+			{ vide
+				? <p className="muet" data-testid="repartition-non-disponible">Répartition par classe : { NA } (classes de fiabilité non publiées{ q.uncertainty.method === 'aucune' ? ', module M2 inactif' : '' }).</p>
+				: <RepartitionClasses niveaux={ q.by_level } /> }
 			<details className="f3-tableau-repli">
 				<summary>Tableau par niveau</summary>
 				<div className="f3-defile">

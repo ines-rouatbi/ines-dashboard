@@ -12,8 +12,9 @@ import { sortAlerts } from '../alertes/AlertesPage';
 import { ALERT_LEVEL, NA, num, utc, withUnit } from '../shared/format';
 import { AvecRessource, EtatPageF3, Kpi, cacheChamps, oui, pourcent, scientifique, useAsync, useInstantane } from './commun';
 import { Carte, Legende, LegendeCapteurs, bornesEchelle, type Echelle } from './Carte';
-import { RAMPE_BLEUE } from './couleurs';
-import { chargerBase, chargerCartes, chargerSerie, type Base, type CarteSol } from './donnees';
+import { RAMPE_VITESSE } from './couleurs';
+import { chargerBase, chargerCartes, chargerSerie, exportCarte, type Base, type CarteSol } from './donnees';
+import { ExportsPublies } from '../../ui/Exports';
 import { SerieMoyeu } from './graphiques';
 import { annulerVis1, debutVis1, finVis1, SEUIL_VIS1_MS, type MesureVis1 } from './vis1';
 
@@ -81,6 +82,7 @@ function Ensemble( { snapshot, latest, jeton }: { snapshot: Snapshot; latest: La
 					Instantané du <span data-testid="valid-time">{ utc( snapshot.valid_time ) }</span> · <code>{ id }</code>
 					{ latest ? <> · données d'entrée { latest.data_status === 'complete' ? 'complètes' : 'dégradées' }</> : null }
 				</p>
+				<ExportsPublies snapshot={ snapshot } />
 			</header>
 
 			<Indicateurs snapshot={ snapshot } />
@@ -156,7 +158,7 @@ function Cartes( { base, cartes, onPeinte }: { base: Base; cartes: CarteSol[]; o
 	const grille = { nx: g.nx, ny: g.ny, dx: g.dx_m, dy: g.dy_m, x0: g.x0_m, y0: g.y0_m };
 	// Échelle commune aux 4 hauteurs (comparaison directe), de 0 au maximum arrondi.
 	const max = cartes.reduce<number | null>( ( m, c ) => ( c.resume.max == null ? m : Math.max( m ?? 0, c.resume.max ) ), null );
-	const echelle = useMemo<Echelle>( () => ( { kind: 'continue', ...bornesEchelle( max, 2 ), rampe: RAMPE_BLEUE, unite: 'm/s', decimales: 1 } ), [ max ] );
+	const echelle = useMemo<Echelle>( () => ( { kind: 'continue', ...bornesEchelle( max, 2 ), rampe: RAMPE_VITESSE, unite: 'm/s', decimales: 1 } ), [ max ] );
 	const stations = base.stations.etat === 'ok' ? base.stations.val.items : null;
 	const rappels = useMemo( () => new Map( cartes.map( ( c ) => [ c.hauteur, () => onPeinte( c.hauteur ) ] ) ), [ cartes, onPeinte ] );
 	return (
@@ -177,6 +179,7 @@ function Cartes( { base, cartes, onPeinte }: { base: Base; cartes: CarteSol[]; o
 							stations={ stations ?? [] }
 							videTexte={ texteCarteVide( c.resume, base.meta ) }
 							onPeinte={ rappels.get( c.hauteur ) }
+							exporter={ exportCarte( base, c, 'm/s' ) }
 						/>
 						{ c.resume.disponibles ? <p className="petit muet">{ texteAbsences( c.resume ) }</p> : null }
 					</div>
@@ -198,6 +201,8 @@ function Alertes( { base, snapshot, erreur }: { base: Base | null; snapshot: Sna
 					: <AvecRessource r={ base.alerts } quoi="Alertes">{ ( a ) => {
 
 						const ouvertes = sortAlerts( a.items.filter( ( x ) => x.status === 'ouverte' ) );
+						// Liste vide ET décompte null : les alertes n'ont pas été calculées (M4 inactif), ce n'est pas « aucune alerte ».
+						if ( ! ouvertes.length && snapshot.kpi.open_alerts == null ) return <p className="muet" data-testid="alertes-non-calculees">Alertes : { NA } (non calculées pour cet instantané).</p>;
 						if ( ! ouvertes.length ) return <p className="muet" data-testid="aucune-alerte">Aucune alerte ouverte.</p>;
 						return (
 							<ul className="f3-alertes">

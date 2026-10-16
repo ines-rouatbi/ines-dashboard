@@ -7,6 +7,7 @@
 import { ApiError, CacheChamps, libelleErreur, type Api } from '../../data';
 import type { Alerts, DataQuality, FieldVar, Meta, Quality, Snapshot, Stations, TimeItem } from '../../data/contract';
 import { encadrer, resumer, valeursSol, type Encadrement, type Resume } from '../../domain/hauteurSol';
+import { csvCarte, nomFichier, type Identite } from '../../domain/exportCsv';
 
 /** Ressource facultative d'un instantané. */
 export type Ressource<T> =
@@ -79,6 +80,23 @@ export async function chargerModele( client: Api, snapshot: Snapshot, signal?: A
 }
 
 export type DonneesModele = Awaited<ReturnType<typeof chargerModele>>;
+
+/** Identification d'un instantané pour les exports CSV (lot F6). */
+export function identite( s: Pick<Snapshot, 'snapshot_id' | 'valid_time' | 'versions'> ): Identite {
+
+	return { snapshot_id: s.snapshot_id, valid_time: s.valid_time, data_kind: s.versions.data_kind, model: s.versions.model };
+
+}
+
+/** Export CSV d'une carte affichée : nom du fichier et générateur (appelé au clic). */
+export function exportCarte( base: Pick<Base, 'meta' | 'terrain'> & { snapshot: Pick<Snapshot, 'snapshot_id' | 'valid_time' | 'versions'> }, carte: CarteSol, unite: string ) {
+
+	return {
+		nom: nomFichier( base.snapshot.snapshot_id, 'carte', `${ carte.hauteur }m-sol`, carte.variable ),
+		generer: () => csvCarte( identite( base.snapshot ), base.meta, { variable: carte.variable, unite, surface: { mode: 'sol', h: carte.hauteur }, valeurs: carte.valeurs, terrain: base.terrain } ),
+	};
+
+}
 
 /** Une carte à une hauteur au-dessus du sol. */
 export interface CarteSol {

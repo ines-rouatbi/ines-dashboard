@@ -1,7 +1,7 @@
 // Montage des pages du lot F4 dans le tableau de bord (routes /eolien et /alertes) : instantané de latest.
 import { AlertesPage } from './alertes/AlertesPage';
 import { EolienPage } from './eolien/EolienPage';
-import { loadAlerts, loadEolien } from './shared/api';
+import { loadAlertesAvecDecompte, loadEolien } from './shared/api';
 import { EtatPage, useDonneesInstantane } from './shared/Instantane';
 import type { EtatLatest } from '../ui/useLatest';
 
@@ -14,7 +14,7 @@ export function Eolien( { latest }: { latest: EtatLatest } ) {
 
 export function Alertes( { latest }: { latest: EtatLatest } ) {
 
-	const etat = useDonneesInstantane( latest, loadAlerts );
-	return <EtatPage titre="Alertes" nom="alertes" etat={ etat }>{ ( alerts ) => <AlertesPage alerts={ alerts } /> }</EtatPage>;
+	const etat = useDonneesInstantane( latest, loadAlertesAvecDecompte );
+	return <EtatPage titre="Alertes" nom="alertes" etat={ etat }>{ ( d ) => <AlertesPage alerts={ d.alerts } decompte={ d.decompte } /> }</EtatPage>;
 
 }

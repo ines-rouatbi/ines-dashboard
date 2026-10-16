@@ -5,11 +5,14 @@
 // le repli SPA (index.html en 200) est une erreur, pas un JSON illisible.
 import { getJSON } from '../../data/api';
 import type { Alerts, SnapshotAssets, SnapshotPoint, WindFarm, WindRose } from './types';
+import type { Snapshot } from '../../data/contract';
 
 export interface SnapshotLite {
 	snapshot_id: string;
 	points: SnapshotPoint[];
 	assets: SnapshotAssets;
+	/** Indicateurs de l'instantané (facultatif ici : seul kpi.open_alerts est lu, par la page Alertes). */
+	kpi?: { open_alerts: Snapshot[ 'kpi' ][ 'open_alerts' ] };
 }
 
 export interface RoseChargee {
@@ -48,6 +51,13 @@ export async function loadEolien( snapshot: SnapshotLite, signal?: AbortSignal )
 		} ) ),
 	] );
 	return { windFarm, windroses };
+
+}
+
+/** Alertes et décompte kpi.open_alerts de l'instantané (null : module d'alertes inactif ; undefined : inconnu). */
+export async function loadAlertesAvecDecompte( snapshot: SnapshotLite, signal?: AbortSignal ) {
+
+	return { alerts: await loadAlerts( snapshot, signal ), decompte: snapshot.kpi?.open_alerts };
 
 }
 

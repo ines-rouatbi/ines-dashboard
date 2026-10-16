@@ -2,6 +2,7 @@
 // Ouvertes d'abord, du plus grave au moins grave ; les alertes closes forment l'historique.
 import { useMemo, useState } from 'react';
 import type { Alert, AlertLevel, Alerts } from '../shared/types';
+import type { Snapshot } from '../../data/contract';
 import { ALERT_KIND, ALERT_LEVEL, LEVEL_RANK, NA, num, quantity, utc } from '../shared/format';
 import '../shared/pages.css';
 
@@ -44,8 +45,26 @@ function AlertCard( { a }: { a: Alert } ) {
 
 }
 
-/** `alerts` = null : snapshot.assets.alerts n'est pas publié pour cet instantané (« non disponible », jamais « 0 alerte »). */
-export function AlertesPage( { alerts }: { alerts: Alerts | null } ) {
+/**
+ * `alerts` = null : snapshot.assets.alerts n'est pas publié pour cet instantané (« non disponible », jamais « 0 alerte »).
+ * `decompte` = snapshot.kpi.open_alerts : null quand le module d'alertes (M4) n'a pas tourné. Une liste vide avec un
+ * décompte null n'est PAS « aucune alerte » : les alertes n'ont pas été calculées. undefined = décompte inconnu.
+ */
+export function AlertesPage( { alerts, decompte }: { alerts: Alerts | null; decompte?: Snapshot[ 'kpi' ][ 'open_alerts' ] } ) {
+
+	if ( alerts && alerts.items.length === 0 && decompte === null ) {
+
+		return (
+			<section className="atom-page" data-testid="page-alertes">
+				<h2>Alertes</h2>
+				<p className="atom-muted" data-testid="alerts-not-computed">
+					Alertes : { NA }. Aucune alerte n’a été calculée pour cet instantané (liste publiée vide et décompte
+					<code> kpi.open_alerts </code> à null : module d’alertes pas encore actif). Ce n’est pas « zéro alerte ».
+				</p>
+			</section>
+		);
+
+	}
 
 	if ( ! alerts ) {
 

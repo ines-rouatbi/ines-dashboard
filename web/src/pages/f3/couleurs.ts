@@ -1,30 +1,30 @@
-// Échelles de couleur des pages F3 (cartes et graphiques).
-// Séquentiel = une seule teinte, du clair au foncé (jamais d'arc-en-ciel) : bleu pour le vent et les
-// grandeurs 0..1, orangé pour l'incertitude (deuxième contexte séquentiel affiché en même temps).
-// Les états des capteurs reprennent la palette d'état (jamais une couleur seule : forme + libellé).
+// Échelles de couleur des pages F3 (cartes et graphiques), alignées sur la charte §17.4 (lot F6, ui/couleurs.ts) :
+// vitesse sur la rampe de la charte (bleu nuit → rouge), incertitude sur la rampe violette, grandeurs 0..1
+// (couverture, fiabilité) en bleu séquentiel, états des capteurs en vert / orange / rouge (jamais une couleur
+// seule : forme + libellé).
 
 import type { StationState } from '../../data/contract';
+import { COULEURS, RAMPE_INCERTITUDE, RAMPE_VITESSE } from '../../ui/couleurs';
 
-/** Rampe séquentielle bleue, du clair (faible) au foncé (fort). */
+export { RAMPE_VITESSE, RAMPE_INCERTITUDE };
+
+/** Rampe séquentielle bleue, du clair (faible) au foncé (fort) : couverture et fiabilité (0..1). */
 export const RAMPE_BLEUE = [ '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b' ];
-/** Rampe séquentielle orangée (incertitude). */
-export const RAMPE_ORANGE = [ '#fde3d4', '#f9c09f', '#f39a6b', '#eb6834', '#c9501f', '#9c3d15', '#6e2a0d' ];
-
-/** Séries des graphiques (ordre fixe) : 1 bleu, 2 orangé. */
-export const SERIE = [ '#2a78d6', '#eb6834' ] as const;
+/** Séries des graphiques (ordre fixe) : 1 accent bleu, 2 sable foncé (pas une couleur d'état). */
+export const SERIE = [ COULEURS.accent, COULEURS.sableTexte ] as const;
 
 /** Classes de fiabilité (ordinales) : élevée foncé → faible clair. */
 export const CLASSES = { elevee: '#184f95', moyenne: '#3987e5', faible: '#9ec5f4' } as const;
 
 /** Statut du nœud (catégoriel) : 1 = mesuré, 0 = estimé. */
-export const STATUT = { mesure: '#eb6834', estime: '#9ec5f4' } as const;
+export const STATUT = { mesure: COULEURS.sableTexte, estime: '#9ec5f4' } as const;
 
 export const ETAT_CAPTEUR: Record<StationState, { couleur: string; forme: 'rond' | 'triangle' | 'croix' | 'carre' | 'losange'; libelle: string }> = {
-	active: { couleur: '#0ca30c', forme: 'rond', libelle: 'actif' },
-	suspecte: { couleur: '#fab219', forme: 'losange', libelle: 'suspect' },
-	derive: { couleur: '#ec835a', forme: 'triangle', libelle: 'en dérive' },
-	muette: { couleur: '#d03b3b', forme: 'croix', libelle: 'muet' },
-	exclue: { couleur: '#6b7d8d', forme: 'carre', libelle: 'exclu' },
+	active: { couleur: COULEURS.ok, forme: 'rond', libelle: 'actif' },
+	suspecte: { couleur: COULEURS.attention, forme: 'losange', libelle: 'suspect' },
+	derive: { couleur: COULEURS.attentionTexte, forme: 'triangle', libelle: 'en dérive' },
+	muette: { couleur: COULEURS.alerte, forme: 'croix', libelle: 'muet' },
+	exclue: { couleur: COULEURS.neutre, forme: 'carre', libelle: 'exclu' },
 };
 
 const rgb = ( hex: string ): [ number, number, number ] => [ 1, 3, 5 ].map( ( k ) => parseInt( hex.slice( k, k + 2 ), 16 ) ) as [ number, number, number ];

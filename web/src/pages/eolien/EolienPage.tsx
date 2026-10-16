@@ -118,6 +118,19 @@ export function EolienPage( { data }: { data: EolienData } ) {
 /** Parc, éoliennes et courbes de puissance (wind-farm.json publié). */
 function Parc( { wf }: { wf: WindFarm } ) {
 
+	// Parc publié mais sans aucune éolienne déclarée (instantanés M6 avant M5) : la production, la puissance
+	// installée et les décomptes valent « non disponible », pas « 0 kW » ni « 0 / 0 ».
+	if ( wf.turbines.length === 0 ) {
+
+		return (
+			<p className="atom-muted" data-testid="farm-empty">
+				Parc éolien : { NA }. Aucune éolienne n’est déclarée dans cet instantané (wind-farm publié sans éolienne) :
+				pas de production, de puissance installée ni de courbe de puissance à afficher.
+			</p>
+		);
+
+	}
+
 	return (
 		<>
 			<div className="atom-kpis">

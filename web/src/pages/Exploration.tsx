@@ -29,6 +29,10 @@ import { Frise } from '../ui/Frise';
 import { CarteSituation } from '../ui/CarteSituation';
 import type { EtatLatest } from '../ui/useLatest';
 import { utc } from './shared/format';
+import { csvCarte, csvProfil, nomFichier } from '../domain/exportCsv';
+import { identite } from './f3/donnees';
+import { ETAT_CAPTEUR, hexVersRgb } from './f3/couleurs';
+import { BoutonCsv } from '../ui/Exports';
 
 // Caches partagés : ils survivent à la navigation entre les pages.
 const champs = new CacheChamps( api );
@@ -171,9 +175,9 @@ async function chargerCoupeV( id: string, m: Modele, r: Reglages, cle: string ):
 
 }
 
-const COULEUR_ETAT: Record<string, [ number, number, number ]> = {
-	active: [ 0.30, 0.75, 0.45 ], suspecte: [ 0.95, 0.80, 0.25 ], derive: [ 0.95, 0.50, 0.15 ], muette: [ 0.60, 0.62, 0.66 ], exclue: [ 0.80, 0.15, 0.15 ],
-};
+// États des capteurs (charte §17.4) : vert actif, orange suspect / en dérive, rouge muet, gris exclu ; toujours
+// accompagnés de leur libellé dans la légende.
+const COULEUR_ETAT: Record<string, [ number, number, number ]> = Object.fromEntries( Object.entries( ETAT_CAPTEUR ).map( ( [ k, e ] ) => [ k, hexVersRgb( e.couleur ).map( ( x ) => x / 255 ) as [ number, number, number ] ] ) );
 const LIBELLE_ETAT: Record<string, string> = { active: 'actif', suspecte: 'suspect', derive: 'en dérive', muette: 'muet', exclue: 'exclu' };
 
 function surfaceEn( m: Modele, s: Surface, x: number, y: number ): number {
@@ -710,6 +714,12 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 							<div><b>{ nd1( planOk.stats.moyenne ) }</b><span>moy m/s</span></div>
 							<div><b>{ nd1( planOk.stats.max ) }</b><span>max m/s</span></div>
 							<p className="muet petit">{ fmt( planOk.stats.valides / ( planOk.stats.noeuds || 1 ) * 100 ) } % des colonnes (hors relief) · vitesse horizontale</p>
+							{ snap && m && planOk.stats.valides ? (
+								<p className="petit">
+									<BoutonCsv testid="export-plan" nom={ nomFichier( snap.snapshot_id, 'plan', planOk.surface.mode === 'sol' ? `${ planOk.surface.h }m-sol` : `${ planOk.surface.z }m-mer`, 'speed' ) }
+										generer={ () => csvCarte( identite( snap ), m.meta, { variable: 'speed', unite: 'm/s', surface: planOk.surface, valeurs: planOk.speed, terrain: m.terrain } ) } />
+								</p>
+							) : null }
 						</div>
 					) : <p className="muet">{ plan.etat === 'erreur' ? plan.message : '—' }</p> }
 				</section>
@@ -717,6 +727,10 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 				<section className="carte" data-testid="profil">
 					<h3>Profil vertical { profil?.res.etat === 'ok' && <span className="muet num">· { fmt( profil.res.val.x_m / 1000, 2 ) }, { fmt( profil.res.val.y_m / 1000, 2 ) } km</span> }</h3>
 					<Profil profil={ profil } />
+					{ profil?.res.etat === 'ok' && snap && m ? (
+						<BoutonCsv testid="export-profil" nom={ nomFichier( snap.snapshot_id, 'profil', `i${ profil.res.val.i }-j${ profil.res.val.j }` ) }
+							generer={ () => csvProfil( identite( snap ), m.meta, ( profil.res as { val: ProfilAffiche } ).val ) } />
+					) : null }
 				</section>
 			</aside>
 		</div>
@@ -752,7 +766,7 @@ function Profil( { profil }: { profil: { res: Chargement<ProfilAffiche> } | null
 									<td>{ fmt( l.speed, 1 ) }</td>
 									<td>{ l.speed_interval.p10 == null ? nd : `${ fmt( l.speed_interval.p10, 1 ) }–${ fmt( l.speed_interval.p90, 1 ) }` }</td>
 									<td>{ l.dir_from_deg == null ? 'calme' : `${ cardinal( l.dir_from_deg ) } ${ dirAffichee( l.dir_from_deg ) }°` }</td>
-									<td>{ l.status === 'mesure' ? 'mesuré' : l.status === 'estime' ? 'estimé' : '—' }</td>
+									<td>{ l.status === 'mesure' ? 'mesuré' : l.status === 'estime' ? 'estimé' : nd }</td>
 									<td>{ l.reliability_class ? `${ LIBELLE_CLASSE[ l.reliability_class ] } (${ fmt( l.reliability, 2 ) })` : nd }</td>
 								</>
 							) }
