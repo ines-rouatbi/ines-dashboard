@@ -16,6 +16,7 @@ import { chargerBase, chargerCartes, chargerSimulation, exportCarte, type Base, 
 import { texteCarteVide } from './Ensemble';
 import { RepartitionClasses } from './graphiques';
 import { SqueletteCarte, SqueletteLignes } from '../../ui/Squelette';
+import { Jauge } from '../../ui/Jauge';
 
 type VarIncertitude = Extract<FieldVar, 'sigma_speed' | 'coverage' | 'reliability' | 'status'>;
 
@@ -65,6 +66,16 @@ function Fiabilite( { snapshot }: { snapshot: Snapshot } ) {
 				<h1>Fiabilité</h1>
 				<p className="muet">Reconstruction courante du <span data-testid="valid-time">{ utc( snapshot.valid_time ) }</span> · <code>{ id }</code></p>
 			</header>
+
+			<section className="f3-bloc jauges" aria-label="Fiabilité de l'instantané en un coup d'œil" data-testid="jauges">
+				<Jauge testid="jauge-fiabilite" valeur={ snapshot.kpi.share_high_reliability } libelle="Nœuds en fiabilité élevée" />
+				<Jauge testid="jauge-couverture" seuil={ 0.8 } libelle="Couverture de l’intervalle à 80 %"
+					valeur={ b && b.quality.etat === 'ok' ? b.quality.val.calibration?.coverage_80 ?? null : null }
+					detail={ ! b ? 'chargement…' : b.quality.etat === 'ok' ? ( b.quality.val.calibration ? b.quality.val.calibration.evaluated_on : 'non calibré' ) : 'qualité non publiée' } />
+				<Jauge testid="jauge-capteurs" libelle="Capteurs visibles"
+					valeur={ snapshot.network.sensors_total ? snapshot.network.sensors_visible / snapshot.network.sensors_total : null }
+					detail={ `${ num( snapshot.network.sensors_visible ) } / ${ num( snapshot.network.sensors_total ) }` } />
+			</section>
 
 			<section className="f3-bloc" aria-labelledby="titre-cartes-fiab">
 				<h2 id="titre-cartes-fiab">Vent et incertitude au-dessus du sol</h2>

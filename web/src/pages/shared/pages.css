@@ -24,10 +24,31 @@ button.atom-kpi[aria-pressed="false"] { opacity: .45; }
 .atom-kpi-label { color: var( --atom-muted ); font-size: 12px; }
 
 .atom-alerts { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.atom-alert { animation: apparait .45s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 45ms); transition: transform .2s, box-shadow .2s; }
+.atom-alert:hover { transform: translateX(3px); box-shadow: var( --ombre-forte ); }
+.atom-filtre { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0 4px; }
+.atom-filtre input { min-width: min(360px, 100%); }
+button.atom-kpi { transition: opacity .2s, transform .15s, box-shadow .2s; }
+button.atom-kpi:hover { transform: translateY(-2px); }
+.atom-kpi { border-radius: var( --rayon ); }
+
+/* Éoliennes animées (UI v2) */
+.rotors { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 4px 0 12px; }
+.rotor { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 12px; background: var( --atom-card ); border: 1px solid var( --atom-line ); border-radius: var( --rayon ); box-shadow: var( --ombre ); min-width: 150px; }
+.rotor svg { width: 72px; height: 100px; overflow: visible; }
+.rotor-mat { fill: var( --encre-3 ); }
+.rotor-pales path { fill: var( --encre-2 ); }
+.rotor-moyeu { fill: var( --encre ); }
+.rotor-pales { transform-origin: 40px 40px; transform-box: view-box; }
+.rotor-pales.tourne { animation: rotor var(--periode) linear infinite; }
+@keyframes rotor { to { transform: rotate(360deg); } }
+.rotor-production .rotor-pales path { fill: var( --accent ); }
+.rotor figcaption { display: flex; flex-direction: column; align-items: center; text-align: center; font-size: 12px; gap: 1px; }
+.rotors-note { flex-basis: 100%; margin: 0; }
 .atom-alert { background: var( --atom-card ); border: 1px solid var( --atom-line ); border-left: 4px solid; border-radius: 8px; padding: 10px 12px; }
 .atom-alert header { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .atom-alert h3 { margin: 0; font-size: 14px; flex: 1; }
-.atom-closed .atom-alert { opacity: .75; }
+.atom-closed .atom-alert > * { opacity: .78; }
 .atom-badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; padding: 1px 6px; border-radius: 4px; border: 1px solid currentColor; }
 .atom-level-critique { border-left-color: var( --atom-critique ); } .atom-level-critique .atom-badge { color: var( --atom-critique ); }
 .atom-level-important { border-left-color: var( --atom-important ); } .atom-level-important .atom-badge { color: var( --atom-important ); }

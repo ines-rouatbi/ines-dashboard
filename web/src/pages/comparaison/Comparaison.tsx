@@ -18,6 +18,7 @@ import { identite } from '../f3/donnees';
 import { texteCarteVide } from '../f3/Ensemble';
 import { chargerComparaison, chargerInstants, choixParDefaut, type Comparaison as Donnees } from './donnees';
 import { SqueletteCarte } from '../../ui/Squelette';
+import { AvantApres } from './AvantApres';
 import '../f3/f3.css';
 
 const NATURE: Record<string, string> = { test: 'test', synthetique: 'synthétique', reel: 'réelle' };
@@ -143,6 +144,7 @@ function Cartes( { d, memeInstant }: { d: Donnees; memeInstant: boolean } ) {
 							resume={ s.carte.resume } stations={ s.base.stations.etat === 'ok' ? s.base.stations.val.items : [] } videTexte={ texteCarteVide( s.carte.resume, s.base.meta ) } />
 					) ) }
 				</div>
+				<AvantApres a={ a.carte.valeurs } b={ b.carte.valeurs } titreA={ utc( a.base.snapshot.valid_time ) } titreB={ utc( b.base.snapshot.valid_time ) } grille={ grille } echelle={ echelle } hauteur={ hauteur } />
 			</section>
 			<div className="f3-grille-principale">
 				<section className="f3-bloc" aria-labelledby="titre-diff">

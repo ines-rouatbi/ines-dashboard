@@ -113,6 +113,36 @@
 .f3-vis1 { margin-top: 0; }
 .f3-na { color: var(--encre-2); background: var(--fond); border: 1px dashed var(--trait); border-radius: 8px; padding: 12px; margin: 0; }
 
+/* Jauges (UI v2) */
+.jauges { display: flex; flex-wrap: wrap; gap: 14px 28px; justify-content: space-around; }
+.jauge { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 170px; text-align: center; font-size: 12px; color: var(--encre-2); }
+.jauge svg { width: 130px; height: 130px; }
+.jauge-fond, .jauge-arc { fill: none; stroke-width: 9; stroke-linecap: round; }
+.jauge-fond { stroke: var(--surface-3); }
+.jauge-arc { stroke: var(--accent); animation: jauge 1.3s cubic-bezier(.2, .8, .2, 1) both; }
+.jauge-ok .jauge-arc { stroke: var(--ok); }
+.jauge-sous .jauge-arc { stroke: var(--attention); }
+@keyframes jauge { from { stroke-dashoffset: var(--plein); } }
+.jauge-seuil { stroke: var(--encre); stroke-width: 2; }
+.jauge-valeur { font-size: 15px; font-weight: 700; fill: var(--encre); font-variant-numeric: tabular-nums; }
+.jauge-na .jauge-valeur { font-size: 9px; font-weight: 500; fill: var(--encre-3); }
+.jauge-objectif { font-size: 7px; fill: var(--encre-3); }
+
+/* Avant / après (UI v2) */
+.avant-apres { margin-top: 14px; }
+.avant-apres-cadre { cursor: ew-resize; touch-action: none; user-select: none; }
+.avant-apres-cadre canvas { position: absolute; inset: 0; }
+.avant-apres-b { position: absolute; inset: 0; }
+.avant-apres-cadre.glisse .avant-apres-b, .avant-apres-cadre.glisse .avant-apres-poignee { transition: none; }
+.avant-apres-b, .avant-apres-poignee { transition: clip-path .15s ease, left .15s ease; }
+.avant-apres-etiquette { position: absolute; top: 6px; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: var(--verre); color: var(--encre); pointer-events: none; }
+.avant-apres-etiquette.gauche { left: 6px; }
+.avant-apres-etiquette.droite { right: 6px; }
+.avant-apres-poignee { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, .3); }
+.avant-apres-poignee span { position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%); background: #fff; color: #12263A; font-size: 10px; padding: 5px 7px; border-radius: 999px; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); white-space: nowrap; }
+.avant-apres-poignee input { position: absolute; top: 50%; left: 0; width: 44px; height: 28px; transform: translate(-50%, -50%); opacity: 0; margin: 0; cursor: ew-resize; }
+.avant-apres-poignee:focus-within span { outline: 2px solid var(--accent-texte); outline-offset: 2px; }
+
 /* Comparaison de deux instants (lot F6) */
 .comparaison-controles { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }
 .comparaison-choix { display: flex; flex-direction: column; gap: 4px; color: var(--encre-2); font-size: 12px; }

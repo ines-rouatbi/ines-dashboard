@@ -7,6 +7,7 @@ import type { Turbine, WindFarm, WindRose } from '../shared/types';
 import { WINDROSE_MIN_VALID } from '../shared/types';
 import { AIR_DENSITY_SOURCE, NA, TURBINE_STATE, interval, num, utc, veer, withUnit } from '../shared/format';
 import { PowerCurveChart, WindRoseChart } from './charts';
+import { Rotors } from './Rotors';
 import '../shared/pages.css';
 
 function TurbineRow( { t }: { t: Turbine } ) {
@@ -149,6 +150,7 @@ function Parc( { wf }: { wf: WindFarm } ) {
 			</div>
 
 			<h3>Éoliennes</h3>
+			<Rotors turbines={ wf.turbines } />
 			<div className="atom-scroll">
 				<table className="atom-table" data-testid="turbines">
 					<thead>

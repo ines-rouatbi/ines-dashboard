@@ -1,6 +1,6 @@
 // Page Alertes (lot F4, BF20 à BF23) : affiche fidèlement /v1/alerts/{id}.
 // Ouvertes d'abord, du plus grave au moins grave ; les alertes closes forment l'historique.
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import type { Alert, AlertLevel, Alerts } from '../shared/types';
 import type { Snapshot } from '../../data/contract';
 import { ALERT_KIND, ALERT_LEVEL, LEVEL_RANK, NA, num, quantity, utc } from '../shared/format';
@@ -18,12 +18,28 @@ export function sortAlerts( items: Alert[] ): Alert[] {
 
 }
 
-function AlertCard( { a }: { a: Alert } ) {
+const sansAccents = ( s: string ) => s.normalize( 'NFD' ).replace( /[\u0300-\u036f]/g, '' ).toLowerCase();
+
+/** Filtre texte (UI v2) : tous les mots, sans accents, sur le titre, la cible, la cause, le type et la recommandation. */
+export function filtrerAlertes( items: Alert[], q: string ): Alert[] {
+
+	const mots = sansAccents( q ).split( /\s+/ ).filter( Boolean );
+	if ( ! mots.length ) return items;
+	return items.filter( ( a ) => {
+
+		const t = sansAccents( `${ a.title } ${ a.target } ${ a.cause } ${ ALERT_KIND[ a.kind ] ?? a.kind } ${ a.recommendation } ${ ALERT_LEVEL[ a.level ] }` );
+		return mots.every( ( m ) => t.includes( m ) );
+
+	} );
+
+}
+
+function AlertCard( { a, rang = 0 }: { a: Alert; rang?: number } ) {
 
 	const measured = quantity( a.value, a.unit );
 	const threshold = quantity( a.threshold, a.unit );
 	return (
-		<li className={ `atom-alert atom-level-${ a.level }` } data-testid="alert" data-alert-id={ a.id } data-level={ a.level } data-status={ a.status }>
+		<li className={ `atom-alert atom-level-${ a.level }` } data-testid="alert" data-alert-id={ a.id } data-level={ a.level } data-status={ a.status } style={ { '--i': Math.min( rang, 12 ) } as CSSProperties }>
 			<header>
 				<span className="atom-badge" data-testid="alert-level">{ ALERT_LEVEL[ a.level ] }</span>
 				<h3 data-testid="alert-title">{ a.title }</h3>
@@ -87,7 +103,11 @@ function ListeAlertes( { alerts }: { alerts: Alerts } ) {
 	const closed = useMemo( () => sortAlerts( alerts.items.filter( ( a ) => a.status === 'close' ) ), [ alerts ] );
 	const counts = useMemo( () => Object.fromEntries( LEVELS.map( ( l ) => [ l, open.filter( ( a ) => a.level === l ).length ] ) ) as Record<AlertLevel, number>, [ open ] );
 	const toggle = ( l: AlertLevel ) => setLevels( ( s ) => { const n = new Set( s ); if ( n.has( l ) ) n.delete( l ); else n.add( l ); return n; } );
+	const [ q, setQ ] = useState( '' );
 	const shown = ( a: Alert ) => levels.has( a.level );
+	const ouvertes = useMemo( () => filtrerAlertes( open.filter( shown ), q ), [ open, levels, q ] ); // eslint-disable-line react-hooks/exhaustive-deps
+	const closes = useMemo( () => filtrerAlertes( closed.filter( shown ), q ), [ closed, levels, q ] ); // eslint-disable-line react-hooks/exhaustive-deps
+	const filtre = q.trim() !== '' || levels.size < LEVELS.length;
 
 	return (
 		<section className="atom-page" data-testid="page-alertes">
@@ -103,15 +123,20 @@ function ListeAlertes( { alerts }: { alerts: Alerts } ) {
 				) ) }
 			</div>
 
+			<div className="atom-filtre">
+				<input type="search" value={ q } onChange={ ( e ) => setQ( e.target.value ) } placeholder="Filtrer : titre, cible, cause, type…" aria-label="Filtrer les alertes" data-testid="alert-filter" />
+				{ filtre ? <span className="atom-muted" role="status" data-testid="alert-filter-count">{ ouvertes.length + closes.length } alerte(s) affichée(s) sur { open.length + closed.length }</span> : null }
+			</div>
+
 			<h3>Ouvertes <span className="atom-muted" data-testid="open-total">({ open.length })</span></h3>
 			{ open.length === 0
 				? <p className="atom-muted" data-testid="no-open">Aucune alerte ouverte.</p>
-				: <ul className="atom-alerts" data-testid="alerts-open">{ open.filter( shown ).map( ( a ) => <AlertCard key={ a.id } a={ a } /> ) }</ul> }
+				: <ul className="atom-alerts" data-testid="alerts-open">{ ouvertes.map( ( a, k ) => <AlertCard key={ a.id } a={ a } rang={ k } /> ) }</ul> }
 
 			<h3>Historique <span className="atom-muted" data-testid="closed-total">({ closed.length })</span></h3>
 			{ closed.length === 0
 				? <p className="atom-muted" data-testid="no-closed">Aucune alerte close.</p>
-				: <ul className="atom-alerts atom-closed" data-testid="alerts-closed">{ closed.filter( shown ).map( ( a ) => <AlertCard key={ a.id } a={ a } /> ) }</ul> }
+				: <ul className="atom-alerts atom-closed" data-testid="alerts-closed">{ closes.map( ( a, k ) => <AlertCard key={ a.id } a={ a } rang={ k } /> ) }</ul> }
 		</section>
 	);
 
