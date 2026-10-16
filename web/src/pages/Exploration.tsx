@@ -33,6 +33,7 @@ import { csvCarte, csvProfil, nomFichier } from '../domain/exportCsv';
 import { identite } from './f3/donnees';
 import { ETAT_CAPTEUR, hexVersRgb } from './f3/couleurs';
 import { BoutonCsv } from '../ui/Exports';
+import { SqueletteBloc, SqueletteLignes } from '../ui/Squelette';
 
 // Caches partagés : ils survivent à la navigation entre les pages.
 const champs = new CacheChamps( api );
@@ -698,7 +699,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 							<dt>Physique</dt>
 							<dd>{ snap.physics ? ( snap.physics.mass_residual_ok ? 'résidu de masse sous le seuil' : 'résidu de masse au-dessus du seuil' ) : nd }</dd>
 						</dl>
-					) : <p className="muet">{ snapshot.etat === 'erreur' ? snapshot.message : latest.etat === 'erreur' ? latest.message : 'chargement…' }</p> }
+					) : snapshot.etat === 'erreur' || latest.etat === 'erreur' ? <p className="muet">{ snapshot.etat === 'erreur' ? snapshot.message : latest.etat === 'erreur' ? latest.message : '' }</p> : <SqueletteLignes n={ 6 } texte="instantané : chargement…" /> }
 				</section>
 
 				<section className="carte">
@@ -741,7 +742,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 function Profil( { profil }: { profil: { res: Chargement<ProfilAffiche> } | null } ) {
 
 	if ( ! profil ) return <p className="muet">Cliquer un point de la scène.</p>;
-	if ( profil.res.etat === 'attente' ) return <p className="muet">chargement…</p>;
+	if ( profil.res.etat === 'attente' ) return <SqueletteBloc hauteur={ 200 } texte="profil : chargement…" />;
 	if ( profil.res.etat === 'erreur' ) return <p className="muet">Profil { profil.res.message }</p>;
 	const p = profil.res.val;
 	return (

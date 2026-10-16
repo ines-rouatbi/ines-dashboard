@@ -181,7 +181,7 @@ code { font-size: .92em; }
 	content: ""; position: absolute; inset: 0; border-radius: 8px; background: rgba(255, 255, 255, .08); z-index: -1;
 }
 
-.barre-droite { display: flex; align-items: center; gap: 8px; }
+.barre-droite { display: flex; align-items: center; gap: 8px; flex: none; }
 .horloge {
 	display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.1;
 	font-variant-numeric: tabular-nums; color: var(--barre-texte-2); font-size: 11px; white-space: nowrap;
@@ -230,7 +230,7 @@ code { font-size: .92em; }
 .bascule-theme .masque-lune { transition: transform .5s cubic-bezier(.4, 1.4, .5, 1); }
 [data-theme="dark"] .bascule-theme .astre { transform: rotate(-40deg) scale(1.1); }
 [data-theme="dark"] .bascule-theme .rayons { opacity: 0; transform: scale(.4) rotate(90deg); }
-[data-theme="dark"] .bascule-theme .masque-lune { transform: translate(-6px, 4px); }
+[data-theme="dark"] .bascule-theme .masque-lune { transform: translate(0, 0); }
 .bascule-theme .masque-lune { transform: translate(8px, -8px); }
 
 /* ---- Bandeau de fraîcheur ---- */
@@ -249,7 +249,7 @@ code { font-size: .92em; }
 
 /* ---- Pages ---- */
 .page { position: relative; flex: 1; min-height: 0; overflow: auto; scroll-behavior: smooth; }
-.page-transition { min-height: 100%; animation: entree-page .38s cubic-bezier(.2, .8, .2, 1) both; }
+.page-transition { height: 100%; animation: entree-page .38s cubic-bezier(.2, .8, .2, 1) both; }
 @keyframes entree-page { from { opacity: 0; transform: translateY(10px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
 .page-vide { padding: 32px 24px; }
 .page-vide h1 { margin: 0 0 6px; font-size: 22px; }
@@ -501,6 +501,10 @@ input[type="search"], input[type="text"] { font: inherit; padding: 6px 10px; bor
 .etat { font-weight: 600; }
 .etat-ok { color: var(--ok-texte); }
 .etat-arret { color: var(--alerte-texte); }
+
+/* ---- Barre supérieure compacte ---- */
+@media (max-width: 1640px) { .bouton-icone .kbd { display: none; } .nav a { padding: 7px 9px; } .topbar { gap: 10px; } }
+@media (max-width: 1480px) { .horloge, .pill .detail { display: none; } }
 
 /* ---- Animations réduites : préférence du système ou choix dans l'interface ---- */
 @media (prefers-reduced-motion: reduce) {

@@ -15,6 +15,7 @@ import { RAMPE_BLEUE, RAMPE_INCERTITUDE, RAMPE_VITESSE, STATUT } from './couleur
 import { chargerBase, chargerCartes, chargerSimulation, exportCarte, type Base, type CarteSol, type Simulation } from './donnees';
 import { texteCarteVide } from './Ensemble';
 import { RepartitionClasses } from './graphiques';
+import { SqueletteCarte, SqueletteLignes } from '../../ui/Squelette';
 
 type VarIncertitude = Extract<FieldVar, 'sigma_speed' | 'coverage' | 'reliability' | 'status'>;
 
@@ -80,7 +81,7 @@ function Fiabilite( { snapshot }: { snapshot: Snapshot } ) {
 						</select>
 					</label>
 				</div>
-				{ base.etat === 'erreur' ? <p className="f3-erreur" role="alert">Cartes : { base.message }</p> : ! b ? <p className="muet" role="status">chargement…</p> : (
+				{ base.etat === 'erreur' ? <p className="f3-erreur" role="alert">Cartes : { base.message }</p> : ! b ? <div className="f3-cartes f3-cartes-2"><SqueletteCarte texte="cartes : chargement…" /><SqueletteCarte /></div> : (
 					<>
 						<LegendeCapteurs reseau={ snapshot.network } stations={ b.stations.etat === 'ok' ? b.stations.val.items : null } />
 						<div className="f3-cartes f3-cartes-2">
@@ -131,7 +132,7 @@ function CarteVariable( { base, c, titre, testid }: { base: Base; c: Chargement<
 	const carte = c.etat === 'ok' ? c.val[ 0 ] : null;
 	const echelle = useMemo( () => ( carte ? echelleVariable( carte.variable, carte.resume.max ) : null ), [ carte ] );
 	if ( c.etat === 'erreur' ) return <p className="f3-erreur" data-testid={ `${ testid }-erreur` }>{ titre } : { c.message }</p>;
-	if ( ! carte || ! echelle ) return <p className="muet" role="status">chargement…</p>;
+	if ( ! carte || ! echelle ) return <SqueletteCarte texte={ `${ titre } : chargement…` } />;
 	const g = base.meta.grid;
 	const titreLegende = VARIABLES_INCERTITUDE.find( ( x ) => x.v === carte.variable )?.libelle ?? 'Vitesse horizontale du vent';
 	return (
@@ -222,7 +223,7 @@ function PanneSimulee() {
 	return (
 		<section className="f3-bloc" aria-labelledby="titre-sim" data-testid="simulation">
 			<h2 id="titre-sim">Panne simulée</h2>
-			{ sim.etat === 'attente' ? <p className="muet" role="status">chargement…</p>
+			{ sim.etat === 'attente' ? <SqueletteLignes n={ 2 } texte="simulation : chargement…" />
 				: sim.etat === 'erreur' ? <p className="f3-erreur">Simulation : { sim.message }</p>
 					: sim.val.etat === 'aucune' ? (
 						<p className="muet" data-testid="aucune-simulation">

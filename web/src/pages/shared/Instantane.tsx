@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { api, libelleErreur } from '../../data';
 import type { EtatLatest } from '../../ui/useLatest';
 import type { SnapshotLite } from './api';
+import { SquelettePage } from '../../ui/Squelette';
 import './pages.css';
 
 export type Chargement<T> = { etat: 'attente' } | { etat: 'ok'; val: T } | { etat: 'erreur'; message: string };
@@ -38,10 +39,11 @@ export function useDonneesInstantane<T>( latest: EtatLatest, charger: ( s: Snaps
 export function EtatPage<T>( { titre, nom, etat, children }: { titre: string; nom: string; etat: Chargement<T>; children: ( val: T ) => ReactNode } ) {
 
 	if ( etat.etat === 'ok' ) return <>{ children( etat.val ) }</>;
+	if ( etat.etat === 'attente' ) return <SquelettePage texte={ `${ titre } : chargement…` } testid={ `page-${ nom }-attente` } />;
 	return (
 		<section className="atom-page" data-testid={ `page-${ nom }-${ etat.etat }` }>
 			<h2>{ titre }</h2>
-			<p className="atom-muted">{ etat.etat === 'attente' ? 'chargement…' : `${ titre } : ${ etat.message }` }</p>
+			<p className="atom-muted" role="status">{ `${ titre } : ${ etat.message }` }</p>
 		</section>
 	);
 

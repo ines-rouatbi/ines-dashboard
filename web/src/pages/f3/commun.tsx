@@ -6,6 +6,7 @@ import type { Snapshot } from '../../data/contract';
 import type { EtatLatest } from '../../ui/useLatest';
 import { NA } from '../shared/format';
 import type { Ressource } from './donnees';
+import { SquelettePage } from '../../ui/Squelette';
 import './f3.css';
 
 /** Cache des champs de l'instantané courant, partagé par la Vue d'ensemble et la page Fiabilité. */
@@ -46,10 +47,11 @@ export function useInstantane( latest: EtatLatest ): Chargement<Snapshot> {
 /** Page en attente ou en erreur (jamais de donnée de démo). */
 export function EtatPageF3( { titre, nom, etat }: { titre: string; nom: string; etat: { etat: 'attente' } | { etat: 'erreur'; message: string } } ) {
 
+	if ( etat.etat === 'attente' ) return <SquelettePage texte={ `${ titre } : chargement…` } testid={ `page-${ nom }-attente` } />;
 	return (
 		<section className="f3-page" data-testid={ `page-${ nom }-${ etat.etat }` }>
 			<h1>{ titre }</h1>
-			<p className="muet" role="status">{ etat.etat === 'attente' ? 'chargement…' : `${ titre } : ${ etat.message }` }</p>
+			<p className="f3-erreur" role="status">{ `${ titre } : ${ etat.message }` }</p>
 		</section>
 	);
 

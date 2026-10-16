@@ -16,6 +16,7 @@ import { RAMPE_VITESSE } from './couleurs';
 import { chargerBase, chargerCartes, chargerSerie, exportCarte, type Base, type CarteSol } from './donnees';
 import { ExportsPublies } from '../../ui/Exports';
 import { SerieMoyeu } from './graphiques';
+import { SqueletteBloc, SqueletteCarte, SqueletteLignes } from '../../ui/Squelette';
 import { annulerVis1, debutVis1, finVis1, SEUIL_VIS1_MS, type MesureVis1 } from './vis1';
 
 /** Message d'une carte sans aucune valeur, selon la raison dominante. */
@@ -97,7 +98,7 @@ function Ensemble( { snapshot, latest, jeton }: { snapshot: Snapshot; latest: La
 					{ base.etat === 'erreur' ? <p className="f3-erreur" role="alert">Cartes : { base.message }</p>
 						: cartes.etat === 'erreur' ? <p className="f3-erreur" role="alert">Cartes : { cartes.message }</p>
 							: b && cartes.etat === 'ok' ? <Cartes base={ b } cartes={ cartes.val } onPeinte={ peinte } />
-								: <p className="muet" role="status">chargement des cartes…</p> }
+								: <div className="f3-cartes">{ HAUTEURS_SOL_M.map( ( h ) => <SqueletteCarte key={ h } texte={ `carte à ${ h } m : chargement…` } /> ) }</div> }
 				</section>
 
 				<aside className="f3-colonne">
@@ -116,7 +117,7 @@ function Ensemble( { snapshot, latest, jeton }: { snapshot: Snapshot; latest: La
 					? serie.val.points.length
 						? <SerieMoyeu points={ serie.val.points } hauteur={ snapshot.kpi.hub_height_agl_m } />
 						: <p className="muet">Aucun instantané publié dans /v1/times.</p>
-					: serie.etat === 'erreur' ? <p className="f3-erreur">Série : { serie.message }</p> : <p className="muet" role="status">chargement de la série…</p> }
+					: serie.etat === 'erreur' ? <p className="f3-erreur">Série : { serie.message }</p> : <SqueletteBloc texte="chargement de la série…" /> }
 				{ serie.etat === 'ok' && serie.val.total > serie.val.points.length
 					? <p className="petit muet">{ serie.val.points.length } derniers instants sur { num( serie.val.total ) }.</p> : null }
 			</section>
@@ -197,7 +198,7 @@ function Alertes( { base, snapshot, erreur }: { base: Base | null; snapshot: Sna
 		<section className="f3-bloc" aria-labelledby="titre-alertes" data-testid="alertes-ouvertes">
 			<h2 id="titre-alertes">Alertes ouvertes</h2>
 			{ erreur ? <p className="f3-erreur">Alertes : { erreur }</p>
-				: ! base ? <p className="muet" role="status">chargement…</p>
+				: ! base ? <SqueletteLignes n={ 3 } texte="alertes : chargement…" />
 					: <AvecRessource r={ base.alerts } quoi="Alertes">{ ( a ) => {
 
 						const ouvertes = sortAlerts( a.items.filter( ( x ) => x.status === 'ouverte' ) );
