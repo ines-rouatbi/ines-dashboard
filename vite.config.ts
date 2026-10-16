@@ -47,8 +47,19 @@ export default defineConfig( {
 		emptyOutDir: true,
 		chunkSizeWarningLimit: 800,
 		rollupOptions: {
-			// Bibliothèques lourdes en morceaux séparés (cache navigateur stable).
-			output: { manualChunks: { three: [ 'three' ], echarts: [ 'echarts' ], react: [ 'react', 'react-dom' ] } },
+			// Bibliothèques lourdes en morceaux séparés (cache navigateur stable). three.js et ECharts ne sont
+			// atteints que par import dynamique (pages et graphiques chargés à la demande) : hors du chargement initial.
+			output: {
+				manualChunks( id ) {
+
+					const paquet = /node_modules[\\/]([^\\/]+)[\\/]/.exec( id )?.[ 1 ];
+					if ( paquet === 'three' ) return 'three';
+					if ( paquet === 'echarts' || paquet === 'zrender' || paquet === 'tslib' ) return 'echarts';
+					if ( paquet === 'react' || paquet === 'react-dom' || paquet === 'scheduler' ) return 'react';
+					return undefined;
+
+				},
+			},
 		},
 	},
 	test: {

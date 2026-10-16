@@ -30,12 +30,20 @@ const enc = encodeURIComponent;
 
 async function requete( url: string, accept: string, signal?: AbortSignal ): Promise<Response> {
 
-	let r: Response;
-	try { r = await fetch( url, { headers: { accept }, signal } ); }
-	catch ( e ) {
+	let r: Response | undefined;
+	// Lecture idempotente : une seule nouvelle tentative sur erreur réseau (connexion keep-alive fermée
+	// par le serveur entre deux requêtes, coupure brève).
+	for ( let essai = 0; ! r; essai ++ ) {
 
-		if ( ( e as Error )?.name === 'AbortError' ) throw e;
-		throw new ApiError( 'reseau', `réseau : ${ ( e as Error )?.message ?? e }` );
+		try { r = await fetch( url, { headers: { accept }, signal } ); }
+		catch ( e ) {
+
+			if ( ( e as Error )?.name === 'AbortError' ) throw e;
+			if ( essai >= 1 ) throw new ApiError( 'reseau', `réseau : ${ ( e as Error )?.message ?? e }` );
+			await new Promise( ( ok ) => setTimeout( ok, 250 ) );
+			if ( signal?.aborted ) throw signal.reason ?? new DOMException( 'Aborted', 'AbortError' );
+
+		}
 
 	}
 

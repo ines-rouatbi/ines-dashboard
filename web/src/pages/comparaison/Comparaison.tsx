@@ -17,6 +17,8 @@ import { EtatPageF3, useAsync } from '../f3/commun';
 import { identite } from '../f3/donnees';
 import { texteCarteVide } from '../f3/Ensemble';
 import { chargerComparaison, chargerInstants, choixParDefaut, type Comparaison as Donnees } from './donnees';
+import { SqueletteCarte } from '../../ui/Squelette';
+import { AvantApres } from './AvantApres';
 import '../f3/f3.css';
 
 const NATURE: Record<string, string> = { test: 'test', synthetique: 'synthétique', reel: 'réelle' };
@@ -112,7 +114,7 @@ export function PageComparaison( { latest }: { latest: EtatLatest } ) {
 function Resultat( { a, b, h }: { a: string; b: string; h: number } ) {
 
 	const c = useAsync( `${ a }|${ b }|${ h }`, ( s ) => chargerComparaison( api, a, b, h, s ) );
-	if ( c.etat === 'attente' ) return <p className="muet" role="status">chargement des deux instants…</p>;
+	if ( c.etat === 'attente' ) return <div className="f3-bloc"><div className="f3-cartes f3-cartes-2"><SqueletteCarte texte="chargement des deux instants…" /><SqueletteCarte /></div></div>;
 	if ( c.etat === 'erreur' ) return <p className="f3-erreur" role="alert" data-testid="comparaison-erreur">Comparaison : { c.message }</p>;
 	return <Cartes d={ c.val } memeInstant={ a === b } />;
 
@@ -142,6 +144,7 @@ function Cartes( { d, memeInstant }: { d: Donnees; memeInstant: boolean } ) {
 							resume={ s.carte.resume } stations={ s.base.stations.etat === 'ok' ? s.base.stations.val.items : [] } videTexte={ texteCarteVide( s.carte.resume, s.base.meta ) } />
 					) ) }
 				</div>
+				<AvantApres a={ a.carte.valeurs } b={ b.carte.valeurs } titreA={ utc( a.base.snapshot.valid_time ) } titreB={ utc( b.base.snapshot.valid_time ) } grille={ grille } echelle={ echelle } hauteur={ hauteur } />
 			</section>
 			<div className="f3-grille-principale">
 				<section className="f3-bloc" aria-labelledby="titre-diff">

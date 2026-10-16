@@ -44,6 +44,18 @@ navigateur → atom.zelqane.com (ce Worker : front statique dist/ + injection cl
   tant que M6 ne les publie pas) ; **charte §17.4** centralisée dans `web/src/ui/couleurs.ts` et les variables CSS
   de `theme.css` (contrôlées par `dev/charte.test.ts`, contrastes AA) ; état du service de calcul (`/api/health`)
   sur la page Modèle. Scénario de démonstration : `docs/SCENARIO_DEMO.md`.
+- **UI v2** (interface animée) : pages et ECharts (`echarts/core`, `web/src/ui/moteurGraphiques.ts`) chargés à la demande,
+  three.js seulement pour l'Exploration ; coquille « en direct » (indicateur de navigation animé, horloge UTC, pastille
+  pulsante selon `compute_status`, badge `data_kind`, squelettes de chargement, toasts aria-live, palette **Ctrl+K**) ;
+  thème clair / sombre (`COULEURS_SOMBRE`, contrastes AA testés) et préférence « animations réduites »
+  (`prefers-reduced-motion` ou palette ; `web/src/ui/preferences.ts`) qui coupe toutes les animations.
+  Vue d'ensemble : indicateurs à compteurs animés et tendances (la valeur publiée reste dans le DOM), « Vent en
+  mouvement » (particules qui suivent `u, v` publiés, `domain/particules.ts`, bilinéaire stricte : jamais de vent
+  inventé ; temps accéléré) ; frise à lecture automatique ×1 ×2 ×4 et raccourcis (Espace, ← →, Début, Fin, 1 2 4) ;
+  changement d'instant ou de hauteur en **fondu d'affichage** (aucune valeur interpolée). Exploration : traceurs le
+  long des lignes (`scene/traceurs.ts`), « voler vers » le point cliqué, vues dessus / sud / est / iso, rotation
+  automatique, coupe balayée, légende flottante. Fiabilité : jauges ; Alertes : filtre et apparition animée ; Éolien :
+  rotors qui tournent selon le vent au moyeu, **seulement en production** ; Comparaison : curseur avant / après.
 - Repère : x = Est (u), z = -Nord (v), y = altitude (w). Nœud (i, j) en `x0 + i·dx`, `y0 + j·dy` ; un nœud
   existe ssi `z − relief ≥ grid.min_agl_m`. Niveaux au-dessus du niveau de la mer, adressés par **indice**
   (0..nz-1) ; la grille est toujours lue dans `/v1/meta`. « Position supposée » affichée si `georef.suppose`.

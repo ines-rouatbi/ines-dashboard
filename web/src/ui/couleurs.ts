@@ -58,26 +58,66 @@ export const POLICES = {
 	titres: '"Inter Display", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
 } as const;
 
-/** Variables CSS de theme.css correspondant aux couleurs d'interface (contrôlé par charte.test.ts). */
-export const VARIABLES_CSS: Record<string, string> = {
-	'--encre': COULEURS.encre,
-	'--encre-2': COULEURS.encre2,
-	'--encre-3': COULEURS.encre3,
-	'--fond': COULEURS.fond,
-	'--panneau': COULEURS.panneau,
-	'--accent': COULEURS.accent,
-	'--accent-texte': COULEURS.accentTexte,
-	'--sable': COULEURS.sable,
-	'--sable-texte': COULEURS.sableTexte,
-	'--trait': COULEURS.trait,
-	'--ok': COULEURS.ok,
-	'--ok-texte': COULEURS.okTexte,
-	'--attention': COULEURS.attention,
-	'--attention-texte': COULEURS.attentionTexte,
-	'--alerte': COULEURS.alerte,
-	'--alerte-texte': COULEURS.alerteTexte,
-	'--attente': COULEURS.neutre,
+/** Rôle (clé de COULEURS) de chaque variable CSS de couleur d'interface de theme.css. */
+const ROLES_CSS: Record<string, keyof typeof COULEURS> = {
+	'--encre': 'encre',
+	'--encre-2': 'encre2',
+	'--encre-3': 'encre3',
+	'--fond': 'fond',
+	'--panneau': 'panneau',
+	'--accent': 'accent',
+	'--accent-texte': 'accentTexte',
+	'--sable': 'sable',
+	'--sable-texte': 'sableTexte',
+	'--trait': 'trait',
+	'--ok': 'ok',
+	'--ok-texte': 'okTexte',
+	'--attention': 'attention',
+	'--attention-texte': 'attentionTexte',
+	'--alerte': 'alerte',
+	'--alerte-texte': 'alerteTexte',
+	'--attente': 'neutre',
 };
+
+/** Variables CSS de theme.css correspondant aux couleurs d'interface (contrôlé par charte.test.ts). */
+export const VARIABLES_CSS: Record<string, string> = Object.fromEntries( Object.entries( ROLES_CSS ).map( ( [ v, k ] ) => [ v, COULEURS[ k ] ] ) );
+
+/**
+ * Thème sombre (UI v2) : mêmes rôles que COULEURS, déclinés sur fond nuit. La charte §17.4 reste la base (encre,
+ * accent bleu ciel, sable, états vert / orange / rouge) ; les teintes sont éclaircies pour garder les contrastes AA
+ * sur le fond et les panneaux sombres (contrôlé par charte.test.ts). Les rampes de données (vitesse, incertitude,
+ * différence) ne changent pas : une couleur de donnée a le même sens dans les deux thèmes.
+ */
+export const COULEURS_SOMBRE: { [ K in keyof typeof COULEURS ]: string } = {
+	encre: '#E4ECF2',
+	encre2: '#BCCAD6',
+	encre3: '#97A9B9',
+	fond: '#0B1622',
+	panneau: '#13212F',
+	/** Accent des aplats (barre de navigation, boutons) : assez foncé pour un texte blanc (≥ 4,5:1). */
+	accent: '#2A78C2',
+	accentTexte: '#7DB9F0',
+	sable: '#C9A46B',
+	sableTexte: '#D9BC8C',
+	trait: '#2A3D50',
+	ok: '#3DAA6E',
+	okTexte: '#72D29B',
+	attention: '#E08A3A',
+	attentionTexte: '#F2AA68',
+	alerte: '#E25B4B',
+	alerteTexte: '#F7958A',
+	neutre: '#8496A6',
+};
+
+/** Couleurs d'interface d'un thème (graphiques ECharts, canevas). */
+export function couleursTheme( t: 'light' | 'dark' ): { readonly [ K in keyof typeof COULEURS ]: string } {
+
+	return t === 'dark' ? COULEURS_SOMBRE : COULEURS;
+
+}
+
+/** Variables CSS du thème sombre (bloc :root[data-theme="dark"] de theme.css, contrôlé par charte.test.ts). */
+export const VARIABLES_CSS_SOMBRE: Record<string, string> = Object.fromEntries( Object.entries( ROLES_CSS ).map( ( [ v, k ] ) => [ v, COULEURS_SOMBRE[ k ] ] ) );
 
 /** Luminance relative WCAG 2.1 d'une couleur #RRGGBB. */
 export function luminance( hex: string ): number {
