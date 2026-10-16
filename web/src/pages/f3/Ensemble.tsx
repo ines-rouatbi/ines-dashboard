@@ -16,6 +16,7 @@ import { RAMPE_VITESSE } from './couleurs';
 import { chargerBase, chargerCartes, chargerSerie, exportCarte, type Base, type CarteSol } from './donnees';
 import { ExportsPublies } from '../../ui/Exports';
 import { SerieMoyeu } from './graphiques';
+import { CarteVivante } from './CarteVivante';
 import { SqueletteBloc, SqueletteCarte, SqueletteLignes } from '../../ui/Squelette';
 import { annulerVis1, debutVis1, finVis1, SEUIL_VIS1_MS, type MesureVis1 } from './vis1';
 
@@ -87,6 +88,10 @@ function Ensemble( { snapshot, latest, jeton }: { snapshot: Snapshot; latest: La
 			</header>
 
 			<Indicateurs snapshot={ snapshot } />
+
+			{ /* Carte animée : montée une fois les 4 cartes chargées (n'entre pas dans la mesure VIS1). */ }
+			{ b && cartes.etat === 'ok' ? <CarteVivante base={ b } />
+				: base.etat === 'erreur' ? null : <section className="f3-bloc"><SqueletteCarte texte="carte animée : chargement…" ratio="2 / 1" /></section> }
 
 			<div className="f3-grille-principale">
 				<section className="f3-carte-bloc" aria-labelledby="titre-cartes">

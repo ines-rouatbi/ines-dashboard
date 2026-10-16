@@ -32,6 +32,12 @@
 	background: repeating-linear-gradient(45deg, var(--hachure-a) 0 4px, var(--hachure-b) 4px 5px);
 }
 .f3-carte-cadre canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.f3-carte-cadre .f3-fantome { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.f3-carte-cadre .particules { position: absolute; inset: 0; image-rendering: auto; pointer-events: none; }
+.f3-carte-cadre { transition: box-shadow .3s; }
+.f3-carte-cadre:hover { box-shadow: 0 0 0 2px var(--accent); }
+.f3-infobulle-dir { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; padding-left: 8px; border-left: 1px solid currentColor; }
+.f3-infobulle-dir svg { width: 13px; height: 13px; transition: transform .25s ease; }
 .f3-carte-vide { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px; color: var(--encre-2); font-weight: 500; background: var(--verre); }
 .f3-infobulle { position: absolute; transform: translate(-50%, calc(-100% - 10px)); background: var(--infobulle-fond); color: var(--infobulle-texte); font-size: 12px; padding: 5px 9px; border-radius: 8px; box-shadow: var(--ombre-forte); white-space: nowrap; pointer-events: none; z-index: 2; font-variant-numeric: tabular-nums; }
 .f3-nord { position: absolute; top: 4px; right: 6px; font-size: 11px; font-weight: 700; color: var(--encre); background: var(--verre); padding: 0 4px; border-radius: 3px; }
@@ -104,3 +110,16 @@
 .comparaison-controles { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: flex-end; }
 .comparaison-choix { display: flex; flex-direction: column; gap: 4px; color: var(--encre-2); font-size: 12px; }
 .comparaison-choix select { max-width: 100%; font-size: 13px; }
+
+/* Vent en mouvement (UI v2) : grande carte animée de la Vue d'ensemble */
+.vivante { display: flex; flex-direction: column; gap: 8px; }
+.vivante-entete { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.vivante-instant { display: inline-flex; align-items: center; gap: 8px; font-size: 18px; font-weight: 700; color: var(--encre); transition: opacity .3s; }
+.etiquette-historique, .etiquette-dernier { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+.etiquette-historique { color: var(--bandeau-texte); background: var(--bandeau-fond); border: 1px solid var(--bandeau-trait); }
+.etiquette-dernier { color: var(--ok-texte); border: 1px solid var(--ok); }
+.vivante-carte .f3-carte-cadre { border-radius: 10px; }
+.vivante-carte.sans-fond .f3-carte-cadre { background: #0B1622; }
+.vivante-carte.sans-fond .f3-carte-cadre > canvas:first-child, .vivante-carte.sans-fond .f3-fantome { opacity: 0 !important; }
+.f3-carte-grande figcaption { font-size: 13px; }
+.en-ligne { display: inline-flex; align-items: center; gap: 6px; }

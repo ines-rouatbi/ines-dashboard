@@ -25,7 +25,8 @@ import { tamponCoupeH, tamponCoupeV, tamponLignes, type AxeCoupe, type Grille, t
 import { brancherScene, signalerEchec, signalerPremierRendu, type AtomEtat, type AtomPick, type AtomReglages } from '../scene/hook';
 import { ProfileChart } from '../ui/ProfileChart';
 import { Legende } from '../ui/Legende';
-import { Frise } from '../ui/Frise';
+import { Frise, useLectureFrise } from '../ui/Frise';
+import { choisirInstant, instantChoisi, useInstantChoisi } from '../ui/instant';
 import { CarteSituation } from '../ui/CarteSituation';
 import type { EtatLatest } from '../ui/useLatest';
 import { utc } from './shared/format';
@@ -43,7 +44,6 @@ const parInstantane = new Map<string, Promise<unknown>>();
 /** Lignes de courant visées selon la densité choisie (décimation, V3D10). */
 const DENSITES_LIGNES = [ 150, 300, 600, 1200 ] as const;
 const H_SOL_MAX = 1000;
-const REJEU_MS = 1500;
 
 const fmt = ( n: number | null | undefined, d = 0 ) =>
 	n == null || ! Number.isFinite( n ) ? '—' : n.toLocaleString( 'fr-FR', { maximumFractionDigits: d, minimumFractionDigits: d } );
@@ -213,7 +213,7 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	const attentes = useRef<Attente[]>( [] );
 	const premierRendu = useRef( false );
 
-	const [ r, setR ] = useState<Reglages>( REGLAGES_INITIAUX );
+	const [ r, setR ] = useState<Reglages>( () => ( { ...REGLAGES_INITIAUX, instantane: instantChoisi() } ) );
 	const rRef = useRef( r );
 	rRef.current = r;
 	/** Clé (cleRendu) de la dernière scène effectivement dessinée. */
@@ -227,7 +227,6 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 	const [ noeud, setNoeud ] = useState<{ i: number; j: number } | null>( null );
 	const [ profil, setProfil ] = useState<{ cle: string; res: Chargement<ProfilAffiche> } | null>( null );
 	const [ renduCle, setRenduCle ] = useState<string | null>( null );
-	const [ lecture, setLecture ] = useState( false );
 
 	const latestId = latest.etat === 'ok' ? latest.latest.snapshot_id : null;
 	const snapshotId = r.instantane ?? latestId;
@@ -488,36 +487,13 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 
 	}, [ noeud, snapshotId, m, snap ] );
 
-	// 13. Rejeu : instantané suivant une fois le courant rendu.
+	// 13. Frise : lecture automatique (×1, ×2, ×4) une fois l'instant courant rendu, raccourcis clavier ; l'instant
+	// choisi est partagé avec la Vue d'ensemble et la palette de commandes (ui/instant.ts).
 	const items = times.etat === 'ok' ? times.val : null;
-	useEffect( () => {
-
-		if ( ! lecture || ! items || renduCle !== cle ) return;
-		const k = items.findIndex( ( x ) => x.snapshot_id === snapshotId );
-		const suivant = items[ k + 1 ];
-		const t = setTimeout( () => {
-
-			if ( ! suivant ) { setLecture( false ); return; }
-			regler( { instantane: suivant.snapshot_id === latestId ? null : suivant.snapshot_id } );
-
-		}, REJEU_MS );
-		return () => clearTimeout( t );
-
-	}, [ lecture, items, renduCle, cle, snapshotId, latestId, regler ] );
-
-	const lancerRejeu = ( on: boolean ) => {
-
-		if ( on && items && items.length > 1 ) {
-
-			// Départ du plus ancien si l'on est au bout de la frise.
-			const k = items.findIndex( ( x ) => x.snapshot_id === snapshotId );
-			if ( k < 0 || k === items.length - 1 ) regler( { instantane: items[ 0 ].snapshot_id === latestId ? null : items[ 0 ].snapshot_id } );
-
-		}
-
-		setLecture( on );
-
-	};
+	const choisirScene = useCallback( ( id: string | null ) => { choisirInstant( id ); regler( { instantane: id } ); }, [ regler ] );
+	const lecteur = useLectureFrise( { items, courant: snapshotId, latest: latestId, pret: renduCle === cle, onChoisir: choisirScene } );
+	const instantGlobal = useInstantChoisi();
+	useEffect( () => { if ( instantGlobal !== rRef.current.instantane ) regler( { instantane: instantGlobal } ); }, [ instantGlobal, regler ] );
 
 	// 14. Crochet de test window.__atom.
 	const etatRef = useRef<() => AtomEtat>( () => { throw new Error( 'scène non prête' ); } );
@@ -673,9 +649,9 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 				</div>
 				<Frise
 					items={ items } erreur={ times.etat === 'erreur' ? times.message : null }
-					courant={ snapshotId } latest={ latestId } lecture={ lecture }
-					onChoisir={ ( id ) => { setLecture( false ); regler( { instantane: id } ); } }
-					onLecture={ lancerRejeu }
+					courant={ snapshotId } latest={ latestId } lecture={ lecteur.lecture }
+					onChoisir={ ( id ) => { lecteur.setLecture( false ); choisirScene( id ); } }
+					onLecture={ lecteur.setLecture } vitesse={ lecteur.vitesse } onVitesse={ lecteur.setVitesse } attenteMs={ lecteur.attenteMs }
 				/>
 			</div>
 

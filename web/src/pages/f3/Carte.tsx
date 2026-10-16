@@ -4,6 +4,10 @@
 // v7, trop pour des éléments SVG d'ECharts dans le budget VIS1. Les nœuds absents (NaN) restent
 // transparents sur un fond hachuré : « absent », jamais une couleur de valeur. Légende chiffrée avec
 // unité, résumé textuel (min, moyenne, max, colonnes disponibles) pour les lecteurs d'écran.
+//
+// UI v2 : changement de valeurs (autre instant, autre hauteur) en FONDU d'affichage (l'ancienne image s'efface sur
+// la nouvelle : aucune valeur interpolée n'est calculée ni affichée) ; calque facultatif de particules qui suivent
+// (u, v) publiés ; infobulle avec la direction d'où vient le vent (flèche dans le sens où il va).
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import type { Snapshot, Station } from '../../data/contract';
@@ -11,6 +15,10 @@ import type { Resume } from '../../domain/hauteurSol';
 import { NA, num } from '../shared/format';
 import { ETAT_CAPTEUR, couleurRampe, hexVersRgb } from './couleurs';
 import { BoutonCsv } from '../../ui/Exports';
+import { ChampParticules, type PaletteParticules } from '../../ui/ChampParticules';
+import { mouvementReduit } from '../../ui/preferences';
+import type { ChampVent } from '../../domain/particules';
+import { cardinal, dirAffichee, dirFrom } from '../../domain/wind';
 
 export type Echelle =
 	| { kind: 'continue'; min: number; max: number; rampe: readonly string[]; unite: string; decimales: number }
@@ -80,18 +88,46 @@ export interface PropsCarte {
 	onPeinte?: () => void;
 	/** Export CSV des valeurs affichées (lot F6) : nom du fichier et générateur appelé au clic. */
 	exporter?: { nom: string; generer: () => string };
+	/** Vent horizontal publié à la même hauteur : direction dans l'infobulle et, si `particules`, calque animé. */
+	vent?: ChampVent | null;
+	particules?: boolean;
+	palette?: PaletteParticules;
+	/** Classe CSS supplémentaire de la figure (ex. grande carte de la Vue d'ensemble). */
+	classe?: string;
 }
 
-export function Carte( { titre, detail, valeurs, grille, echelle, resume, stations = [], testid, videTexte, onPeinte, exporter }: PropsCarte ) {
+/** Direction affichée d'un nœud : « vient du NO (315°) » et angle de la flèche (sens où VA le vent), ou null (calme, absent). */
+export function directionNoeud( vent: ChampVent | null | undefined, k: number ): { texte: string; versDeg: number } | null {
+
+	if ( ! vent ) return null;
+	const d = dirFrom( vent.u[ k ], vent.v[ k ] );
+	if ( d == null ) return Number.isNaN( vent.u[ k ] ) || Number.isNaN( vent.v[ k ] ) ? null : { texte: 'calme', versDeg: NaN };
+	return { texte: `vient du ${ cardinal( d ) } (${ dirAffichee( d ) }°)`, versDeg: ( d + 180 ) % 360 };
+
+}
+
+export function Carte( { titre, detail, valeurs, grille, echelle, resume, stations = [], testid, videTexte, onPeinte, exporter, vent, particules, palette, classe }: PropsCarte ) {
 
 	const ref = useRef<HTMLCanvasElement | null>( null );
-	const [ survol, setSurvol ] = useState<{ x: number; y: number; texte: string } | null>( null );
+	const fantome = useRef<HTMLCanvasElement | null>( null );
+	const peinte = useRef( false );
+	const [ survol, setSurvol ] = useState<{ x: number; y: number; texte: string; dir: { texte: string; versDeg: number } | null } | null>( null );
 	const px = useMemo( () => rasteriser( valeurs, grille.nx, grille.ny, echelle ), [ valeurs, grille.nx, grille.ny, echelle ] );
 
 	useEffect( () => {
 
 		const c = ref.current, ctx = c?.getContext( '2d' );
 		if ( ! c || ! ctx ) { onPeinte?.(); return; }
+		// Fondu d'affichage : l'image précédente passe sur un canevas « fantôme » qui s'efface au-dessus de la nouvelle.
+		const f = fantome.current, fctx = f?.getContext( '2d' );
+		if ( peinte.current && f && fctx && ! mouvementReduit() && typeof f.animate === 'function' ) {
+
+			f.width = c.width; f.height = c.height;
+			fctx.drawImage( c, 0, 0 );
+			f.animate( [ { opacity: 1 }, { opacity: 0 } ], { duration: 550, easing: 'ease-in-out', fill: 'forwards' } );
+
+		}
+		peinte.current = true;
 		c.width = grille.nx; c.height = grille.ny;
 		ctx.putImageData( new ImageData( px, grille.nx, grille.ny ), 0, 0 );
 		onPeinte?.();
@@ -112,22 +148,35 @@ export function Carte( { titre, detail, valeurs, grille, echelle, resume, statio
 		const i = Math.min( grille.nx - 1, Math.max( 0, Math.floor( fx * grille.nx ) ) );
 		const j = Math.min( grille.ny - 1, Math.max( 0, grille.ny - 1 - Math.floor( fy * grille.ny ) ) );
 		const x = grille.x0 + i * grille.dx, y = grille.y0 + j * grille.dy;
-		setSurvol( { x: fx * 100, y: fy * 100, texte: `x ${ num( x / 1000, 1 ) } km · y ${ num( y / 1000, 1 ) } km : ${ valeurTexte( valeurs[ j * grille.nx + i ], echelle ) }` } );
+		const k = j * grille.nx + i;
+		setSurvol( { x: fx * 100, y: fy * 100, texte: `x ${ num( x / 1000, 1 ) } km · y ${ num( y / 1000, 1 ) } km : ${ valeurTexte( valeurs[ k ], echelle ) }`, dir: Number.isNaN( valeurs[ k ] ) ? null : directionNoeud( vent, k ) } );
 
 	};
 
 	const largeurKm = ( grille.nx - 1 ) * grille.dx / 1000, hauteurKm = ( grille.ny - 1 ) * grille.dy / 1000;
 	return (
-		<figure className="f3-carte" data-testid={ testid } data-disponibles={ resume.disponibles }>
+		<figure className={ `f3-carte${ classe ? ` ${ classe }` : '' }` } data-testid={ testid } data-disponibles={ resume.disponibles }>
 			<figcaption>
 				<strong>{ titre }</strong>{ detail ? <span className="muet"> · { detail }</span> : null }
 			</figcaption>
 			<div className="f3-carte-cadre" style={ { aspectRatio: `${ grille.nx * grille.dx } / ${ grille.ny * grille.dy }` } }
 				onMouseMove={ deplacer } onMouseLeave={ () => setSurvol( null ) }>
 				<canvas ref={ ref } role="img" aria-label={ `${ titre } : ${ resumeTexte }` } />
+				<canvas ref={ fantome } className="f3-fantome" aria-hidden="true" />
+				{ particules && vent ? <ChampParticules champ={ vent } palette={ palette } vmaxCouleur={ echelle.kind === 'continue' ? echelle.max : null } testid={ `${ testid }-particules` } /> : null }
 				{ stations.map( ( s ) => <Marqueur key={ s.id } s={ s } g={ grille } /> ) }
 				{ ! resume.disponibles ? <div className="f3-carte-vide" data-testid={ `${ testid }-vide` }>{ videTexte ?? 'aucune valeur à cette hauteur' }</div> : null }
-				{ survol ? <div className="f3-infobulle" style={ { left: `${ survol.x }%`, top: `${ survol.y }%` } } role="status">{ survol.texte }</div> : null }
+				{ survol ? (
+					<div className="f3-infobulle" style={ { left: `${ survol.x }%`, top: `${ survol.y }%` } } role="status">
+						{ survol.texte }
+						{ survol.dir ? (
+							<span className="f3-infobulle-dir">
+								{ Number.isFinite( survol.dir.versDeg ) ? <svg viewBox="0 0 16 16" aria-hidden="true" style={ { transform: `rotate(${ survol.dir.versDeg }deg)` } }><path d="M8 1 13 9H9.5v6h-3V9H3z" fill="currentColor" /></svg> : null }
+								{ survol.dir.texte }
+							</span>
+						) : null }
+					</div>
+				) : null }
 				<span className="f3-nord" aria-hidden="true">N ↑</span>
 			</div>
 			<p className="f3-carte-resume petit" data-testid={ `${ testid }-resume` }>{ resumeTexte }</p>
