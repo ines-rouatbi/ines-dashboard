@@ -16,6 +16,9 @@
 // allocation : scene/traceurs.ts) ; fondu d'affichage des lignes quand le plan change (autre instant, autre hauteur) ;
 // caméra animée (« voler vers » le point cliqué, vues prédéfinies dessus / sud / est / isométrique) ; rotation
 // automatique douce en option. Animations réduites : traceurs masqués, transitions instantanées, pas de rotation.
+// Éoliennes : petite éolienne symbolique posée sur la nacelle (mât, nacelle, rotor à 3 pales) dont le rotor fait face
+// au vent publié au moyeu et tourne comme sur la page Éolien (production, ralenti à l'arrêt, immobile si indisponible) ;
+// taille symbolique, hors échelle comme les têtes de repères.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -23,6 +26,7 @@ import { intersecterSurface, libelleDistance, longueurEchelle } from '../domain/
 import { bilineaireTolerante } from '../domain/lignes';
 import { teinteRelief, type TamponLignes, type TamponMaillage } from './tampons';
 import { Traceurs } from './traceurs';
+import { orientationRotor, vitesseAngulaire, type ModeRotor, type RotorRepere } from './rotors';
 import { mouvementReduit, surPreferences } from '../ui/preferences';
 
 /** Largeur de la scène (unités three.js) pour l'étendue Est du domaine. */
@@ -58,9 +62,26 @@ export interface PickResult { x: number; y: number; z: number; fx: number; fy: n
 
 export type OnPick = ( p: PickResult ) => void;
 
-export interface Repere { x: number; y: number; zSol: number; zHaut: number; couleur: [ number, number, number ] }
+export interface Repere { x: number; y: number; zSol: number; zHaut: number; couleur: [ number, number, number ]; rotor?: RotorRepere }
 
 export interface Visibilite { relief: boolean; lignes: boolean; coupeH: boolean; coupeV: boolean; stations: boolean; eoliennes: boolean }
+
+/** Éolienne symbolique : rayon du rotor et hauteur du mât au-dessus de la nacelle (unités de la scène). */
+const RAYON_ROTOR = 2.2, MAT_ROTOR = 2.8;
+const COULEUR_PALES: Record<ModeRotor, number> = { production: 0xf2f7ff, ralenti: 0xa9b3bf, immobile: 0x6f7884 };
+
+/** Pale effilée dans le plan XY, du moyeu vers +Y. */
+function geometriePale(): THREE.BufferGeometry {
+
+	const f = new THREE.Shape();
+	f.moveTo( - 0.13, 0.18 );
+	f.quadraticCurveTo( - 0.2, 0.9, - 0.05, RAYON_ROTOR );
+	f.lineTo( 0.04, RAYON_ROTOR );
+	f.quadraticCurveTo( 0.16, 0.8, 0.13, 0.18 );
+	f.closePath();
+	return new THREE.ShapeGeometry( f, 6 );
+
+}
 
 const lin = ( c: number ) => ( c <= 0.04045 ? c / 12.92 : ( ( c + 0.055 ) / 1.055 ) ** 2.4 );
 
@@ -172,6 +193,8 @@ export class Viz {
 	private readonly teteMarqueur: THREE.Mesh;
 	private stations: { tiges: THREE.LineSegments; tetes: THREE.InstancedMesh; reperes: Repere[] } | null = null;
 	private eoliennes: { tiges: THREE.LineSegments; tetes: THREE.InstancedMesh; reperes: Repere[] } | null = null;
+	/** Éoliennes symboliques animées (UI v2), hors du groupe monde. */
+	private rotors: { groupe: THREE.Group; pales: THREE.Group; local: THREE.Vector3; vitesse: number; mode: ModeRotor }[] = [];
 	private marqueurLocal: THREE.Vector3 | null = null;
 	private etiquettes: { sprite: THREE.Sprite; local: THREE.Vector3; dy: number }[] = [];
 	private surfacePick: ( ( x: number, y: number ) => number ) | null = null;
@@ -340,6 +363,8 @@ export class Viz {
 
 		}
 		this.controls.update( dt );
+		// Rotors : sens horaire vu de face (depuis l'amont), arrêtés en mouvement réduit.
+		if ( ! this._reduit ) for ( const r of this.rotors ) if ( r.vitesse && r.groupe.visible ) r.pales.rotation.z -= r.vitesse * dt;
 		if ( this.anime && ! this._reduit ) this.matLignes.uniforms.uTemps.value = this._horloge.getElapsedTime();
 		// Fondu d'affichage des lignes et des traceurs après un changement de plan (aucune donnée interpolée).
 		if ( this._fondu ) {
@@ -573,6 +598,7 @@ export class Viz {
 		if ( this.nord ) this._versMonde( this.nord.userData.local as THREE.Vector3, this.nord.position );
 		if ( this.marqueurLocal ) this._versMonde( this.marqueurLocal, this.teteMarqueur.position );
 		for ( const c of [ this.stations, this.eoliennes ] ) if ( c ) this._placerTetes( c.tetes, c.reperes );
+		for ( const r of this.rotors ) this._versMonde( r.local, r.groupe.position );
 
 	}
 
@@ -732,7 +758,54 @@ export class Viz {
 	setStations( r: Repere[] ) { this.stations = this._couche( this.stations, r, new THREE.SphereGeometry( 0.55, 12, 8 ), 0xffffff ); }
 
 	/** Éoliennes : mât du sol au moyeu, nacelle au moyeu. */
-	setEoliennes( r: Repere[] ) { this.eoliennes = this._couche( this.eoliennes, r, new THREE.OctahedronGeometry( 0.9 ), 0xf4f6f8 ); }
+	setEoliennes( r: Repere[] ) {
+
+		this.eoliennes = this._couche( this.eoliennes, r, new THREE.OctahedronGeometry( 0.9 ), 0xf4f6f8 );
+		this._rotors( r );
+
+	}
+
+	/** Éolienne symbolique sur la nacelle de chaque repère qui porte un rotor : mât, nacelle, moyeu, 3 pales. */
+	private _rotors( reperes: Repere[] ) {
+
+		for ( const r of this.rotors ) this._vider( r.groupe );
+		this.rotors = [];
+		for ( const rp of reperes ) {
+
+			const ro = rp.rotor;
+			if ( ! ro ) continue;
+			const groupe = new THREE.Group(), pivot = new THREE.Group(), pales = new THREE.Group();
+			const blanc = new THREE.MeshLambertMaterial( { color: 0xe9eef3 } );
+			const mat = new THREE.Mesh( new THREE.CylinderGeometry( 0.07, 0.13, MAT_ROTOR, 8 ), blanc );
+			mat.position.y = MAT_ROTOR / 2;
+			const nacelle = new THREE.Mesh( new THREE.BoxGeometry( 0.3, 0.3, 0.75 ), blanc.clone() );
+			const moyeu = new THREE.Mesh( new THREE.SphereGeometry( 0.17, 12, 8 ), blanc.clone() );
+			moyeu.position.z = 0.42;
+			const matPales = new THREE.MeshLambertMaterial( { color: COULEUR_PALES[ ro.mode ], side: THREE.DoubleSide } );
+			for ( let k = 0; k < 3; k ++ ) {
+
+				const pale = new THREE.Mesh( geometriePale(), matPales );
+				pale.rotation.z = k * 2 * Math.PI / 3;
+				pales.add( pale );
+
+			}
+			pales.position.z = 0.45;
+			pivot.position.y = MAT_ROTOR;
+			pivot.rotation.y = orientationRotor( ro.dirFromDeg );
+			pivot.add( nacelle, moyeu, pales );
+			groupe.add( mat, pivot );
+			groupe.userData = { mode: ro.mode, dirFromDeg: ro.dirFromDeg };
+			const local = new THREE.Vector3( rp.x, rp.zHaut, - rp.y );
+			this._versMonde( local, groupe.position );
+			this.hors.add( groupe );
+			this.rotors.push( { groupe, pales, local, vitesse: vitesseAngulaire( ro.periode ), mode: ro.mode } );
+
+		}
+
+	}
+
+	/** Rotors affichés : mode et vitesse angulaire (rad/s), pour l'état et le crochet de test. */
+	get rotorsEoliennes() { return this.rotors.map( ( r ) => ( { mode: r.mode, vitesse: r.vitesse, angle: r.pales.rotation.z } ) ); }
 
 	get trianglesCoupeH(): number { return this.coupeH.visible ? this.coupeH.userData.triangles ?? 0 : 0; }
 	get trianglesCoupeV(): number { return this.coupeV.visible ? this.coupeV.userData.triangles ?? 0 : 0; }
@@ -748,6 +821,7 @@ export class Viz {
 		this.coupeV.visible = v.coupeV;
 		if ( this.stations ) this.stations.tiges.visible = this.stations.tetes.visible = v.stations;
 		if ( this.eoliennes ) this.eoliennes.tiges.visible = this.eoliennes.tetes.visible = v.eoliennes;
+		for ( const r of this.rotors ) r.groupe.visible = v.eoliennes;
 
 	}
 
