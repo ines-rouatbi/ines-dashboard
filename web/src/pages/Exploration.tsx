@@ -21,8 +21,6 @@ import { bilineaireTolerante, lignesDeCourant, type Lignes } from '../domain/lig
 import { echelle as calculerEchelle, VARIABLE_COLORATION, type Coloration, type Echelle } from '../domain/palettes';
 import { libelleDistance } from '../domain/maillage';
 import { Viz, type PickResult, type Repere, type Visibilite, type VueCamera } from '../scene/viz';
-import { provenanceAuMoyeu, type RotorRepere } from '../scene/rotors';
-import { periodeRalenti, periodeRotor } from './eolien/Rotors';
 import { useMouvementReduit } from '../ui/preferences';
 import { tamponCoupeH, tamponCoupeV, tamponLignes, type AxeCoupe, type Grille, type Surface } from '../scene/tampons';
 import { brancherScene, signalerEchec, signalerPremierRendu, type AtomEtat, type AtomPick, type AtomReglages } from '../scene/hook';
@@ -433,27 +431,14 @@ export function Exploration( { latest }: { latest: EtatLatest } ) {
 		Promise.all( [
 			memo( `st/${ snapshotId }`, () => api.stations( snapshotId ) ).then( ( s ) => s.items, ( e ) => { erreurs.push( `capteurs ${ libelleErreur( e ) }` ); return null; } ),
 			snap.assets.wind_farm ? memo( `wf/${ snapshotId }`, () => api.windFarm( snapshotId ) ).then( ( w ) => w.turbines, ( e ) => { erreurs.push( `éoliennes ${ libelleErreur( e ) }` ); return null; } ) : Promise.resolve( null ),
-		] ).then( async ( [ stations, turbines ] ) => {
+		] ).then( ( [ stations, turbines ] ) => {
 
-			// Provenance du vent au moyeu de chaque éolienne (profil précalculé ; absent : rotor vers le sud).
-			const profils = await Promise.all( ( turbines ?? [] ).map( ( t ) => snap.points.some( ( p ) => p.id === t.id && p.profile )
-				? memo( `pr/${ snapshotId }/${ t.id }`, () => api.profile( snapshotId, t.id ) ).catch( () => null )
-				: Promise.resolve( null ) ) );
 			if ( ! actif || ! vizRef.current ) return;
 			const sol = ( x: number, y: number ) => bilineaireTolerante( m.terrain, m.dom.nx, m.dom.ny, ( x - m.dom.x0 ) / m.dom.dx, ( y - m.dom.y0 ) / m.dom.dy );
 			const rep = ( x: number, y: number, h: number, couleur: [ number, number, number ] ): Repere => ( { x: x - m.dom.x0, y: y - m.dom.y0, zSol: sol( x, y ), zHaut: sol( x, y ) + h, couleur } );
 			vizRef.current.setStations( ( stations ?? [] ).map( ( s ) => rep( s.x_m, s.y_m, s.height_agl_m, COULEUR_ETAT[ s.state ] ?? [ 1, 1, 1 ] ) ) );
 			const sites = snap.points.filter( ( p ) => p.kind !== 'eolienne' ).map( ( p ) => rep( p.x_m, p.y_m, 80, [ 0.75, 0.55, 0.95 ] ) );
-			vizRef.current.setEoliennes( [ ...( turbines ?? [] ).map( ( t, k ) => {
-
-				const production = periodeRotor( t ), ralenti = periodeRalenti( t );
-				const rotor: RotorRepere = {
-					periode: production ?? ralenti, dirFromDeg: provenanceAuMoyeu( profils[ k ], t.hub_agl_m ),
-					mode: production != null ? 'production' : ralenti != null ? 'ralenti' : 'immobile',
-				};
-				return { ...rep( t.x_m, t.y_m, t.hub_agl_m, [ 0.96, 0.97, 0.98 ] ), rotor };
-
-			} ), ...sites ] );
+			vizRef.current.setEoliennes( [ ...( turbines ?? [] ).map( ( t ) => rep( t.x_m, t.y_m, t.hub_agl_m, [ 0.96, 0.97, 0.98 ] ) ), ...sites ] );
 			vizRef.current.setVisibilite( visibilite( rRef.current ) );
 			setCouches( { stations, turbines, erreurs } );
 
