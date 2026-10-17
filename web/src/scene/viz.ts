@@ -68,6 +68,8 @@ export interface Visibilite { relief: boolean; lignes: boolean; coupeH: boolean;
 
 /** Éolienne symbolique : rayon du rotor et hauteur du mât au-dessus de la nacelle (unités de la scène). */
 const RAYON_ROTOR = 2.2, MAT_ROTOR = 2.8;
+/** Agrandissement de toute l’éolienne symbolique (mât, nacelle, pales), proportions conservées. */
+const ECHELLE_EOLIENNE = 2.2;
 const COULEUR_PALES: Record<ModeRotor, number> = { production: 0xf2f7ff, ralenti: 0xa9b3bf, immobile: 0x6f7884 };
 
 /** Pale effilée dans le plan XY, du moyeu vers +Y. */
@@ -794,6 +796,7 @@ export class Viz {
 			pivot.rotation.y = orientationRotor( ro.dirFromDeg );
 			pivot.add( nacelle, moyeu, pales );
 			groupe.add( mat, pivot );
+			groupe.scale.setScalar( ECHELLE_EOLIENNE );
 			groupe.userData = { mode: ro.mode, dirFromDeg: ro.dirFromDeg };
 			const local = new THREE.Vector3( rp.x, rp.zHaut, - rp.y );
 			this._versMonde( local, groupe.position );
