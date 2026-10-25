@@ -42,4 +42,7 @@ Le connecteur se lance sur le Colab d'ines (voir la remise hors salon).
 ```bash
 npx wrangler dev   # http://127.0.0.1:8787 — /api/* répond « service_asleep » → journée d'exemple
 npx wrangler dev --var ORIGIN:http://127.0.0.1:8000   # contre un service pcfno3d local
+powershell -ExecutionPolicy Bypass -File dev\lancer-local.ps1   # ines-pc : relais IPv4 + Worker sur :8787
 ```
+Sur ines-pc il n'y a pas de route IPv6 : `wrangler dev` reste bloque en essayant l'adresse IPv6 du
+tunnel. `dev/relais_ipv4.py` (127.0.0.1:8771) joint le tunnel en IPv4 ; la production n'en a pas besoin.
