@@ -1,9 +1,9 @@
 // Tests fonctionnels headless (projet « headless ») : npm test.
 // Fumée sur l'existant ; les scénarios sur les 3 instantanés de test du contrat arrivent avec contract/ (16/10).
 import { test, expect } from '@playwright/test';
-import { assertIsAtom, sceneBox } from '../../lib/atom';
+import { assertIsAtom } from '../../lib/atom';
 
-test( 'la page servie est le tableau de bord ATOM, sans erreur JavaScript', async ( { page } ) => {
+test( 'la page servie est ATOM Wind, sans erreur JavaScript', async ( { page } ) => {
 
 	const errors: string[] = [];
 	page.on( 'pageerror', ( e ) => errors.push( e.message ) );
@@ -12,7 +12,7 @@ test( 'la page servie est le tableau de bord ATOM, sans erreur JavaScript', asyn
 	const res = await page.goto( '/' );
 	expect( res?.status() ).toBe( 200 );
 	await assertIsAtom( page );
-	await sceneBox( page );
+	await expect( page.locator( '#c1' ) ).toBeVisible();   // carte « Mon vent » d'ATOM Wind
 	await page.waitForTimeout( 2_000 );
 	// Le 503 de /api quand le GPU dort est attendu ; toute autre erreur ne l'est pas.
 	expect( errors.filter( ( e ) => ! /503|Service Unavailable/i.test( e ) ) ).toEqual( [] );
@@ -21,12 +21,13 @@ test( 'la page servie est le tableau de bord ATOM, sans erreur JavaScript', asyn
 
 test( 'la scène 3D a un contexte WebGL', async ( { page } ) => {
 
-	await page.goto( '/' );
+	// ATOM Wind : la scène three.js vit dans l'onglet « Carte 3D »
+	await page.goto( '/#carte3d' );
 	await assertIsAtom( page );
-	await sceneBox( page );
+	await page.waitForSelector( '#three canvas', { timeout: 15_000 } );
 	const hasGl = await page.evaluate( () => {
 
-		const c = document.querySelector( 'canvas' ) as HTMLCanvasElement | null;
+		const c = document.querySelector( '#three canvas' ) as HTMLCanvasElement | null;
 		return !! c && !! ( c.getContext( 'webgl2' ) ?? c.getContext( 'webgl' ) );
 
 	} );

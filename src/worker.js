@@ -1,7 +1,9 @@
 // Worker atom.zelqane.com — façade de PC-FNO3D.
 //
 // Rôles :
-//   1. Servir la viz three.js (assets statiques dans ./public) à la racine.
+//   1. Servir le front-end ATOM Wind (assets statiques dans ./public) à la racine :
+//      public/index.html + public/atom-data.js, construits dans le dépôt pcfno3d
+//      (scripts/build_atom_wind.py, webapp/atom-wind/) ; la page lit /api/atom-wind/*.
 //   2. Proxifier /api/* et /mcp* vers le tunnel (ORIGIN = atom-origin.zelqane.com),
 //      en INJECTANT la clé d'API lecture-seule côté serveur (X-API-Key) : le navigateur
 //      ne porte jamais la clé.
