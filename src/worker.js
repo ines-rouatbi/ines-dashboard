@@ -77,7 +77,12 @@ async function proxy( request, env, url, ctx ) {
 	// PCFNO3D_ALLOWED_HOSTS côté ines (sinon /mcp répondrait 421).
 
 	const headers = filterHeaders( request.headers );
-	if ( env.PCFNO3D_READ_KEY ) headers.set( 'X-API-Key', env.PCFNO3D_READ_KEY );
+	// Session d'un compte ATOM Wind (cahier v12, BF43) : le navigateur la porte dans X-ATOM-Session ;
+	// elle remplace alors la clé de lecture (le service vérifie la clé et son rôle). Sinon, clé de lecture.
+	const session = request.headers.get( 'x-atom-session' );
+	headers.delete( 'x-atom-session' );
+	if ( session && /^pcf_[A-Za-z0-9_-]{32}$/.test( session ) ) headers.set( 'X-API-Key', session );
+	else if ( env.PCFNO3D_READ_KEY ) headers.set( 'X-API-Key', env.PCFNO3D_READ_KEY );
 	// Mcp-Session-Id et MCP-Protocol-Version sont recopiés tels quels par filterHeaders.
 
 	const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
