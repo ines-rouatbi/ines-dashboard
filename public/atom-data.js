@@ -175,7 +175,12 @@ function banniere(){
     const horsLigne = A.dernierEtat ? `<b>Service hors ligne</b> : dernier état réel connu, reçu le ${fmtInstant(A.dernierEtat)}. ` : "";
     const I = A.jour.instants, hh = I.map(x => `${String(Math.floor(x.heure_locale)).padStart(2,"0")} h`).join(", ");
     const modele = A.jour.modele || A.grille.modele;
-    if(A.jour.temps_reel && A.jour.prevision){
+    if(A.jour.archive){
+      const maj = fmtInstant(A.jour.mis_a_jour_utc);
+      src.innerHTML = horsLigne + `<b>Historique</b> : vent du <b>${fmtDate(A.jour.date)}</b> tel que calculé par <b>PC-FNO3D</b> (${modele}) `
+        + (A.jour.prevision ? `en prévision (GFS), dernier calcul le ${maj}.` : `en temps réel (GFS et anémomètres), dernier calcul le ${maj}.`);
+      if(fr) fr.textContent = `Historique · ${fmtDate(A.jour.date)}`;
+    } else if(A.jour.temps_reel && A.jour.prevision){
       const maj = new Date(A.jour.mis_a_jour_utc), hm = maj.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Tunis" });
       src.innerHTML = horsLigne + `<b>Prévision</b> du vent pour le <b>${fmtDate(A.jour.date)}</b>, calculée par <b>PC-FNO3D</b> (${modele}) `
         + `à partir de la prévision GFS (pas encore de mesure des stations pour ce jour). Calculée à ${hm}.`
@@ -203,7 +208,10 @@ function banniere(){
       sel.innerHTML = (A.direct ? opt("direct", "Aujourd'hui, temps réel")
           + (pv[0] ? opt("prev1", `Demain ${fmtDate(pv[0])} (prévision)`) : "")
           + (pv[1] ? opt("prev2", `Après-demain ${fmtDate(pv[1])} (prévision)`) : "") : "")
-        + A.jours.map(d => `<option value="${d.date}"${d.date === cle ? " selected" : ""}>${fmtDate(d.date)} (${d.instants.length} instants)</option>`).join("");
+        + A.jours.map(d => `<option value="${d.date}"${d.date === cle ? " selected" : ""}>${fmtDate(d.date)} (${d.instants.length} instants)</option>`).join("")
+        + ((A.historique || []).length ? `<optgroup label="Historique">` + A.historique.map(h => opt(`hist:${h.nom}`,
+            h.type === "temps reel" ? `${fmtDate(h.date)} (temps réel archivé)` : `${fmtDate(h.date)} (prévision J+${h.echeance_j} émise le ${fmtDate(h.emise_le)})`)).join("")
+            + `</optgroup>` : "");
       sel.hidden = false;
     }
   } else {
@@ -222,7 +230,8 @@ const RELATIF = { direct: 0, prev1: 1, prev2: 2 };
 async function telechargerJour(date){
   const j = RELATIF[date];
   const d = j !== undefined ? await get(`/atom-wind/direct?j=${j}`, 240000)
-                            : await get(`/atom-wind/jour?date=${encodeURIComponent(date)}`, 180000);
+          : date.startsWith("hist:") ? await get(`/atom-wind/historique/${encodeURIComponent(date.slice(5))}`, 60000)
+          : await get(`/atom-wind/jour?date=${encodeURIComponent(date)}`, 180000);
   d.cle = date;
   d._vent = decoder(d.vent);
   d._sigma = d.sigma_vitesse ? decoder(d.sigma_vitesse) : null;
@@ -388,6 +397,33 @@ async function chargerQualite(){
 }
 A.chargerQualite = chargerQualite;
 
+// ------------------------------------------------------------------ alertes du service (BF22, S4)
+// Temps réel seulement : une station sans mesure depuis plusieurs heures (selon sa cadence : METAR
+// horaire, SYNOP toutes les 3 h), et les heures dont le champ conserve mal la masse.
+const POS_STATIONS = { DTTA: [36.8504, 10.2156], INM60729: [36.4333, 10.0833], INM60728: [36.45, 10.7333] };
+const CADENCE_H = { DTTA: 1, INM60729: 3, INM60728: 3 };
+A.alertesService = xy => {
+  if(!A.pret() || !A.jour.temps_reel || A.jour.archive) return [];
+  const out = [], I = A.jour.instants.filter(x => x.source === "temps reel" && Array.isArray(x.stations));
+  for(const [code, [la, lo]] of Object.entries(POS_STATIONS)){
+    if(!I.length) break;
+    let n = 0; for(let k = I.length - 1; k >= 0 && !I[k].stations.includes(code); k--) n++;
+    const c = CADENCE_H[code], nom = NOMS_STATIONS[code];
+    if(n < 3 * c) continue;
+    out.push({ cls: n >= 6 * c ? "warn" : "info", p: xy(la, lo), r: 1.5, t: `Station muette : ${nom}`, where: nom,
+               when: n === I.length ? "aucune mesure reçue aujourd'hui" : `aucune mesure depuis ${n} h`,
+               what: "Le vent est calculé sans cette station : la fiabilité baisse autour d'elle.",
+               todo: "Vérifier la transmission de la station (METAR ou SYNOP)." });
+  }
+  const mauvais = A.jour.instants.filter(x => x.residu_masse_ok === false);
+  if(mauvais.length)
+    out.push({ cls: "warn", p: xy(36.65, 10.42), r: 6, at: mauvais[0].heure_locale, t: "Physique : résidu de masse au-dessus du seuil",
+               where: "Grand Tunis", when: `${mauvais.length} heure(s), dès ${mauvais[0].heure_locale} h`,
+               what: "Le champ calculé conserve mal la masse à ces heures : valeurs moins sûres.",
+               todo: "Consulter la vue Fiabilité ; signaler à l'équipe si cela se répète." });
+  return out;
+};
+
 // bandeau du tableau de bord (TB1) : ce que le modèle servi a réellement fait à l'heure affichée
 const NOMS_STATIONS = { DTTA: "Tunis-Carthage", INM60729: "Zaghouan", INM60728: "Nabeul" };
 A.kpisReels = h => {
@@ -409,8 +445,12 @@ A.kpisReels = h => {
     if(isFinite(u) && isFinite(v)){ s += Math.hypot(u, v); n++; }
   }
   if(n) out.push(["Vent au moyeu (80 m)", `${(s / n).toFixed(1).replace(".", ",")} m/s`, "moyenne de la zone"]);
+  const xi = I.length ? I.reduce((b, y) => Math.abs(y.heure_locale - h) < Math.abs(b.heure_locale - h) ? y : b, I[0]) : null;
   const d2 = A.qualite && A.qualite.dso.find(l => l.code === "DSO2");
-  if(d2 && d2.valeur !== null)
+  if(xi && typeof xi.residu_masse_rms === "number")
+    out.push(["Résidu de masse", xi.residu_masse_rms.toExponential(1).replace(".", ","),
+              xi.residu_masse_ok ? "cet instant, sous le seuil" : "cet instant, au-dessus du seuil"]);
+  else if(d2 && d2.valeur !== null)
     out.push(["Résidu de masse", Number(d2.valeur).toExponential(1).replace(".", ","), d2.conforme ? "sous le seuil (test)" : "au-dessus du seuil (test)"]);
   return out;
 };
@@ -499,6 +539,7 @@ A.choisirJour = async date => {
   const src = document.getElementById("aw-source");
   if(src) src.innerHTML = date === "direct" ? "Calcul du vent d'aujourd'hui par le modèle…"
     : /^prev/.test(date) ? "Calcul de la prévision par le modèle…"
+    : date.startsWith("hist:") ? "Lecture de l'historique…"
     : `Calcul du vent du ${fmtDate(date)} par le modèle…`;
   try { await chargerJour(date); A.erreur = null; }
   catch(e){ A.erreur = e; }
@@ -537,7 +578,7 @@ function lancerPage(){
   if(A.pret()){ chargerAtlas(); sourceEolien(); installerAssistant(); installerValeurStations(); installerRapports(); chargerQualite(); }
   // temps réel : nouvelles mesures et nouvelle échéance toutes les 30 min
   setInterval(() => {
-    if(!A.jour || !A.jour.temps_reel) return;
+    if(!A.jour || !A.jour.temps_reel || A.jour.archive) return;
     A.trois = {}; A.ensembles = {};
     A.choisirJour(A.jour.cle || "direct").then(chargerTrois).then(chargerEnsembles);
   }, 30 * 60 * 1000);
@@ -553,6 +594,7 @@ async function demarrer(){
     A.z0 = Float32Array.from(A.grille.z0_m.flat());
     const J = await get("/atom-wind/jours", 20000);
     A.jours = J.jours || []; A.direct = J.direct || null;
+    try { A.historique = (await get("/atom-wind/historique", 15000)).journees || []; } catch(e){ A.historique = []; }
     if(!A.jours.length && !A.direct) throw new Error("aucune journée servie");
     try { const p = await get("/atom-wind/reseau-aneo", 20000);
           A.plan = p.features.filter(f => f.properties.type === "capteur ANEO propose")
