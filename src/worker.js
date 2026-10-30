@@ -38,7 +38,35 @@ function filterHeaders( src ) {
 
 }
 
-async function proxy( request, env, url ) {
+// Dernier état réel connu (cahier v12, 17.1) : chaque réponse réussie des routes d'ATOM Wind est
+// gardée dans le cache du Worker ; quand le Colab dort, on la ressert avec l'en-tête
+// x-atom-dernier-etat (date de réception) au lieu d'un affichage de démonstration.
+const DERNIER_ETAT = /^\/api\/atom-wind\/(grille|jours|jour|direct|reseau-aneo)$/;
+const GARDE_S = 14 * 24 * 3600;
+
+async function garderEtat( request, resp ) {
+
+	const corps = await resp.arrayBuffer();
+	const h = new Headers( { 'content-type': resp.headers.get( 'content-type' ) || 'application/json',
+		'cache-control': `public, max-age=${ GARDE_S }`, 'x-atom-recu-le': new Date().toISOString() } );
+	await caches.default.put( new Request( request.url, { method: 'GET' } ), new Response( corps, { status: 200, headers: h } ) );
+
+}
+
+async function dernierEtat( request ) {
+
+	if ( request.method !== 'GET' || ! DERNIER_ETAT.test( new URL( request.url ).pathname ) ) return null;
+	const r = await caches.default.match( new Request( request.url, { method: 'GET' } ) );
+	if ( ! r ) return null;
+	const h = new Headers( r.headers );
+	h.set( 'x-atom-dernier-etat', r.headers.get( 'x-atom-recu-le' ) || '' );
+	h.set( 'cache-control', 'no-store' );
+	h.delete( 'x-atom-recu-le' );
+	return new Response( r.body, { status: 200, headers: h } );
+
+}
+
+async function proxy( request, env, url, ctx ) {
 
 	const origin = new URL( env.ORIGIN );
 	const target = new URL( request.url );
@@ -68,14 +96,23 @@ async function proxy( request, env, url ) {
 
 	} catch ( e ) {
 
-		return serviceDown( `origine injoignable: ${ e && e.message ? e.message : e }` );
+		return ( await dernierEtat( request ) ) || serviceDown( `origine injoignable: ${ e && e.message ? e.message : e }` );
 
 	}
 
 	// Erreurs d'un tunnel éteint : 502/504 (timeout d'origine) et la plage Cloudflare 520–530
 	// (521 origine refusée, 522 timeout, 523 injoignable, 524 délai, 530/1016 DNS d'origine).
 	// Les codes applicatifs d'uvicorn (401, 403, 421, 404, 5xx<520) passent tels quels.
-	if ( resp.status === 502 || resp.status === 504 || ( resp.status >= 520 && resp.status <= 530 ) ) return serviceDown( `origine ${ resp.status }` );
+	if ( resp.status === 502 || resp.status === 504 || ( resp.status >= 520 && resp.status <= 530 ) ) {
+
+		return ( await dernierEtat( request ) ) || serviceDown( `origine ${ resp.status }` );
+
+	}
+	if ( resp.status === 200 && request.method === 'GET' && DERNIER_ETAT.test( url.pathname ) && ctx ) {
+
+		ctx.waitUntil( garderEtat( request, resp.clone() ).catch( () => {} ) );
+
+	}
 
 	// On renvoie le corps en FLUX (pas de .text()/.json() : le streamable HTTP reste intact).
 	const out = filterHeaders( resp.headers );
@@ -111,7 +148,7 @@ export default {
 
 			}
 
-			return proxy( request, env, url );
+			return proxy( request, env, url, ctx );
 
 		}
 
