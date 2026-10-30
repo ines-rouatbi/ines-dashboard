@@ -41,7 +41,7 @@ function filterHeaders( src ) {
 // Dernier état réel connu (cahier v12, 17.1) : chaque réponse réussie des routes d'ATOM Wind est
 // gardée dans le cache du Worker ; quand le Colab dort, on la ressert avec l'en-tête
 // x-atom-dernier-etat (date de réception) au lieu d'un affichage de démonstration.
-const DERNIER_ETAT = /^\/api\/atom-wind\/(grille|jours|jour|direct|reseau-aneo)$/;
+const DERNIER_ETAT = /^\/api\/atom-wind\/(grille|jours|jour|direct|ensemble|reseau-aneo)$/;
 const GARDE_S = 14 * 24 * 3600;
 
 async function garderEtat( request, resp ) {
