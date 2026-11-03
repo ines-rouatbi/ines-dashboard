@@ -1,0 +1,18 @@
+{
+  // Démonstration publique d'ATOM Wind sur une adresse workers.dev (sans le domaine atom.zelqane.com).
+  // Même code et mêmes fichiers que la configuration principale ; pas de route personnalisée.
+  // Déployer : npx wrangler deploy -c wrangler.demo.jsonc
+  "name": "atom-wind-demo",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-20",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "ORIGIN": "https://atom-origin.zelqane.com"
+  }
+}
